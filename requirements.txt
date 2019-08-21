@@ -1,0 +1,13 @@
+torch
+torchvision
+pandas
+numpy 
+scipy
+GPUtil
+dill
+tensorboardX
+tables
+scikit-learn
+seaborn
+cox
+matplotlib

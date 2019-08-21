@@ -1,0 +1,10 @@
+sphinx-automodapi            
+sphinx-rtd-theme            
+sphinxcontrib-applehelp    
+sphinxcontrib-devhelp     
+sphinxcontrib-fulltoc   
+sphinxcontrib-htmlhelp 
+sphinxcontrib-jsmath 
+sphinxcontrib-qthelp
+sphinxcontrib-serializinghtml
+sphinx_fontawesome

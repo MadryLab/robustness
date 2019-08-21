@@ -1,0 +1,3 @@
+[submodule "src/cox"]
+	path = src/cox
+	url = git@github.com:andrewilyas/cox.git
