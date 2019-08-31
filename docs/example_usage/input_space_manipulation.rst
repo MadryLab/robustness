@@ -68,7 +68,7 @@ examples for a ResNet-50 on the dataset CIFAR-10.
    can use the utilities provided in the :mod:`robustness.tools` module::
 
       from robustness.tools.vis_tools import show_image_row
-      from robustness.tools.constants import CLASS_DICT
+      from robustness.tools.label_maps import CLASS_DICT
 
       # Get predicted labels for adversarial examples
       pred, _ = model(im_adv)
