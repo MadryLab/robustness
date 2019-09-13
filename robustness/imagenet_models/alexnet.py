@@ -36,7 +36,7 @@ class AlexNet(nn.Module):
         )
         self.last_relu = nn.ReLU(inplace=True)
         self.last_relu_fake = FakeReLUM()
-        self.last_layer = nn.Linear(4096, num_classes),
+        self.last_layer = nn.Linear(4096, num_classes)
 
     def forward(self, x, with_latent=False, fake_relu=False, no_relu=False):
         x = self.features(x)
