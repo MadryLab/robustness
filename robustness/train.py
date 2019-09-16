@@ -374,12 +374,12 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
     if adv:
         attack_kwargs = {
             'constraint': args.constraint,
-            'eps': args.eps,
+            'eps': eps,
             'step_size': args.attack_lr,
             'iterations': args.attack_steps,
             'random_start': False,
             'custom_loss': adv_criterion,
-            'random_restarts': args.random_restarts,
+            'random_restarts': random_restarts,
             'use_best': bool(args.use_best)
         }
 
