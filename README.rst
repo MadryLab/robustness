@@ -103,6 +103,50 @@ reference. Functionality provided by the library includes:
    # Train a model
    train.train_model(train_args, m, (train_loader, val_loader), store=out_store)
 
+Pretrained models
+--------
+
+Along with the training code, we release a number of pretrained models for
+different datasets, norms and ε-train values. This list will be updated as
+we release more or improved models. *Please cite this library (see bibtex
+entry below) if you use these models in your research.*
+
+CIFAR L2-norm (ResNet50):
+
+- `ε = 0.0 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_nat.pt>`_ (standard training)
+- `ε = 0.25 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_eps_0_25.pt>`_
+- `ε = 0.5 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_eps_0_5.pt>`_
+- `ε = 1.0 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_eps_1_0.pt>`_
+
+For each (model, ε-test) combination we evaluate 20-step and 100-step PGD with a
+step size of `2.5 * ε-test / num_steps`. Since these two accuracies are quite 
+close to each other, we do not consider more steps of PGD.
+For each value of ε-test, we highlight the best robust accuracy achieved over
+different ε-train in bold.
+
++--------------+----------------+-----------------+---------------------+---------------------+
+| CIFAR L2-robust accuracy                                                                    |
++--------------+----------------+-----------------+---------------------+---------------------+
+|              | ε-train                                                                      |
++--------------+----------------+-----------------+---------------------+---------------------+
+| ε-test       | 0.0            | 0.25            | 0.5                 | 1.0                 |
++==============+================+=================+=====================+=====================+
+| 0.0          | **95.25% / -** | 92.77%  / -     | 90.83% / -          | 81.62% / -          |
++--------------+----------------+-----------------+---------------------+---------------------+
+| 0.25         |  8.66% / 7.34% | 81.21% / 81.19% | **82.34% / 82.31%** | 75.53% / 75.53%     |
++--------------+----------------+-----------------+---------------------+---------------------+
+| 0.5          |  0.28% / 0.14% | 62.30% / 62.13% | **70.17% / 70.11%** | 68.63% / 68.61%     |
++--------------+----------------+-----------------+---------------------+---------------------+
+| 1.0          |  0.00% / 0.00% | 21.18% / 20.66% | 40.47% / 40.22%     | **52.72% / 52.61%** |
++--------------+----------------+-----------------+---------------------+---------------------+
+| 2.0          |  0.00% / 0.00% |  0.58% /  0.46% |  5.23% /  4.97%     | **18.59% / 18.05%** |
++--------------+----------------+-----------------+---------------------+---------------------+
+
+(Note that we did not perform any hyperparameter tuning and simply used the same
+hyperparameters as standard training. It is likely that exploring different 
+training hyperparameters will increasse these robust accuracies by a few percent
+points.)
+
 Citation
 --------
 If you use this library in your research, cite it as
