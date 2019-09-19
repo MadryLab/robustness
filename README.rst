@@ -113,10 +113,10 @@ entry below) if you use these models in your research.*
 
 CIFAR L2-norm (ResNet50):
 
-- `ε = 0.0 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_nat.pt>`_ (standard training)
-- `ε = 0.25 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_eps_0_25.pt>`_
-- `ε = 0.5 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_eps_0_5.pt>`_
-- `ε = 1.0 <https://robustmodels.s3.us-east-2.amazonaws.com/cifar_eps_1_0.pt>`_
+- `ε = 0.0 <https://www.dropbox.com/s/yhpp4yws7sgi6lj/cifar_nat.pt?dl=0>`_ (standard training)
+- `ε = 0.25 <https://www.dropbox.com/s/2qsp7pt6t7uo71w/cifar_l2_0_25.pt?dl=0>`_
+- `ε = 0.5 <https://www.dropbox.com/s/1zazwjfzee7c8i4/cifar_l2_0_5.pt?dl=0>`_
+- `ε = 1.0 <https://www.dropbox.com/s/s2x7thisiqxz095/cifar_l2_1_0.pt?dl=0>`_
 
 For each (model, ε-test) combination we evaluate 20-step and 100-step PGD with a
 step size of `2.5 * ε-test / num_steps`. Since these two accuracies are quite 
