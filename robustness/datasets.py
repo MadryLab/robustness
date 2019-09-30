@@ -221,6 +221,41 @@ class RestrictedImageNet(DataSet):
             raise ValueError("Dataset doesn't support pytorch_pretrained")
         return imagenet_models.__dict__[arch](num_classes=self.num_classes)
 
+class CustomImageNet(DataSet):
+    '''
+    CustomImagenet Dataset 
+
+    A subset of ImageNet with the user-specified labels
+
+    To initialize, just provide the path to the full ImageNet dataset
+    along with a list of lists of wnids to be grouped together
+    (no special formatting required).
+
+    '''
+    def __init__(self, data_path, custom_grouping, **kwargs):
+        """
+        """
+        ds_name = 'custom_imagenet'
+        ds_kwargs = {
+            'num_classes': len(custom_grouping),
+            'mean': ch.tensor([0.4717, 0.4499, 0.3837]), 
+            'std': ch.tensor([0.2600, 0.2516, 0.2575]),
+            'custom_class': None,
+            'label_mapping': get_label_mapping(ds_name,
+                custom_grouping),
+            'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
+            'transform_test': da.TEST_TRANSFORMS_IMAGENET
+        }
+        super(CustomImageNet, self).__init__(ds_name,
+                data_path, **ds_kwargs)
+
+    def get_model(self, arch, pretrained):
+        """
+        """
+        if pretrained:
+            raise ValueError("Dataset doesn't support pytorch_pretrained")
+        return imagenet_models.__dict__[arch](num_classes=self.num_classes)
+
 class CIFAR(DataSet):
     """
     CIFAR-10 dataset [Kri09]_.
