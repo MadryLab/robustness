@@ -1,4 +1,5 @@
 import torch as ch
+import numpy as np
 import torch.nn as nn
 from torch.optim import SGD, lr_scheduler
 from torchvision.utils import make_grid
@@ -75,6 +76,10 @@ def make_optimizer_and_schedule(args, model, checkpoint):
     schedule = None
     if args.step_lr:
         schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr)
+    elif args.custom_schedule == 'cyclic':
+        eps = args.epochs
+        lr_func = lambda t: np.interp([t], [0, eps*2//5, eps], [0, args.lr, 0])[0]
+        schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
     elif args.custom_schedule:
         cs = args.custom_schedule
         periods = eval(cs) if type(cs) is str else cs
@@ -377,7 +382,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             'eps': eps,
             'step_size': args.attack_lr,
             'iterations': args.attack_steps,
-            'random_start': False,
+            'random_start': args.random_start,
             'custom_loss': adv_criterion,
             'random_restarts': random_restarts,
             'use_best': bool(args.use_best)
