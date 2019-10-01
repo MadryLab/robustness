@@ -24,10 +24,10 @@ TRAINING_DEFAULTS = {
         "step_lr": 50
     },
     datasets.ImageNet: {
-        "epochs": 350,
+        "epochs": 200,
         "batch_size":256,
         "weight_decay":1e-4,
-        "step_lr": 150
+        "step_lr": 50
     },
     datasets.RestrictedImageNet: {
         "epochs": 150,
