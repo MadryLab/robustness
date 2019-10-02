@@ -31,13 +31,16 @@ should contain the files "wordnet.is_a.txt", "words.txt" and
 
    superclass_wnid, class_ranges, label_map = in_hier.get_superclasses(n_classes, 
                                                 ancestor_wnid=ancestor_wnid,
+                                                superclass_lowest=superclass_lowest,
                                                 balanced=balanced)                                      
 
-To create the desired number of superclass we use 
+2. To create the desired number of superclass we use 
 py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.get_superclasses`, 
 which takes in the desired number of superclasses :samp:`n_classes`, an
 optional WordNet ID :samp:`ancestor_wnid` to pick superclasses that share a 
-common ancestor in the WordNet hierarchy, and an optional boolean 
+common ancestor in the WordNet hierarchy, an optional set of WordNet IDs of 
+superclasses which should not be further sub-classes :samp:`superclass_lowest`
+(if encountered), and an optional boolean 
 :samp:`balanced` to get a balanced dataset (where each superclass 
 has the same number of ImageNet subclasses).
 (see :py:meth:`the docstring 
@@ -47,7 +50,18 @@ more details). This method returns WordNet IDs of chosen superclasses
 for each of the superclasses :samp:`class_ranges`, and a mapping from 
 superclass number to its human-interpretable description :samp:`label_map`.
 
-2. We can then create a dataset and the corresponding data loader
+If instead you already have a list of superclass WordNet IDs :samp:`ancestor_wnid`
+that you would like to use to build a custom dataset, you could do:
+
+.. code-block:: python
+
+   class_ranges, label_map = in_hier.get_subclasses(superclass_wnid, 
+                                                balanced=balanced)       
+
+Some sample superclass groupings can be found in 
+py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.common_superclass_wnid`.
+
+3. We can then create a dataset and the corresponding data loader
 using:
 
 .. code-block:: python
