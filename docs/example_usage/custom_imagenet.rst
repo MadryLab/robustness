@@ -1,0 +1,77 @@
+Creating a custom dataset by superclassing ImageNet 
+====================================================
+
+.. raw:: html
+
+In this document, we will discuss how to create a custom N class 
+subset of ImageNet data by leveraging the WordNet hierarchy to 
+build superclasses. The robustness library provides functionality
+to do this via :py:class:`~robustness.datasets.CustomImageNet`
+and :py:class:`~robustness.tools.imagenet_helpers.ImageNetHierarchy`.
+For example:
+
+1. To probe the WordNet hierarchy and create the desired
+number of superclasses, you could do:
+
+.. code-block:: python
+
+   from robustness.tools.imagenet_helpers import ImageNetHierarchy
+
+   in_hier = ImageNetHierarchy(in_path, 
+                               in_info_path)
+
+
+Here, :samp:`in_path` should point to a folder with the ImageNet
+dataset in ``train`` and ``val`` sub-folders. :samp:`in_info_path`
+should contain the files "wordnet.is_a.txt", "words.txt" and 
+"imagenet_class_index.json" which can be obtained from 
+`here <http://image-net.org/download-API>`_. Then:
+
+.. code-block:: python
+
+   superclass_wnid, class_ranges, label_map = in_hier.get_superclasses(n_classes, 
+                                                ancestor_wnid=ancestor_wnid,
+                                                balanced=balanced)                                      
+
+To create the desired number of superclass we use 
+py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.get_superclasses`, 
+which takes in the desired number of superclasses :samp:`n_classes`, an
+optional WordNet ID :samp:`ancestor_wnid` to pick superclasses that share a 
+common ancestor in the WordNet hierarchy, and an optional boolean 
+:samp:`balanced` to get a balanced dataset (where each superclass 
+has the same number of ImageNet subclasses).
+(see :py:meth:`the docstring 
+<robustness.tools.imagenet_helpers.ImageNetHierarchy.get_superclasses>` for
+more details). This method returns WordNet IDs of chosen superclasses 
+:samp:`superclass_wnid`, sets of ImageNet subclasses to group together
+for each of the superclasses :samp:`class_ranges`, and a mapping from 
+superclass number to its human-interpretable description :samp:`label_map`.
+
+2. We can then create a dataset and the corresponding data loader
+using:
+
+.. code-block:: python
+
+  from robustness import datasets
+
+  custom_dataset = datasets.CustomImageNet(in_path, 
+                                           class_ranges)
+
+  train_loader, test_loader = dataset.make_loaders(workers=num_workers, 
+                                                   batch_size=batch_size)
+
+You're all set! You can then use this :samp:`custom_dataset` and loaders
+just as you would any other existing/custom dataset in the robustness 
+library. For instance, you could visualize training set samples and their 
+labels using:
+
+.. code-block:: python
+
+  from robustness.tools.vis_tools import show_image_row
+
+  iterator = enumerate(train_loader)
+
+  _, (im, lab) = next(iterator)
+
+  show_image_row([im], 
+                 tlist=[[label_map[int(k)] for k in lab]])
