@@ -50,16 +50,21 @@ more details). This method returns WordNet IDs of chosen superclasses
 for each of the superclasses :samp:`class_ranges`, and a mapping from 
 superclass number to its human-interpretable description :samp:`label_map`.
 
-If instead you already have a list of superclass WordNet IDs :samp:`ancestor_wnid`
-that you would like to use to build a custom dataset, you could do:
+You could also directly provide a list of superclass WordNet IDs :samp:`ancestor_wnid`
+that you would like to use to build a custom dataset. For instance, some sample superclass 
+groupings can be found in 
+py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.common_superclass_wnid`.
+
 
 .. code-block:: python
 
-   class_ranges, label_map = in_hier.get_subclasses(superclass_wnid, 
-                                                balanced=balanced)       
+  from robustness.tools.imagenet_helpers import common_superclass_wnid
 
-Some sample superclass groupings can be found in 
-py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.common_superclass_wnid`.
+  superclass_wnid = common_superclass_wnid('mixed_13')
+  class_ranges, label_map = in_hier.get_subclasses(superclass_wnid, 
+                                                   balanced=balanced)       
+
+
 
 3. We can then create a dataset and the corresponding data loader
 using:
