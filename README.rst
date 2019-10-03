@@ -111,21 +111,26 @@ different datasets, norms and ε-train values. This list will be updated as
 we release more or improved models. *Please cite this library (see bibtex
 entry below) if you use these models in your research.*
 
-CIFAR L2-norm (ResNet50):
-
-- `ε = 0.0 <https://www.dropbox.com/s/yhpp4yws7sgi6lj/cifar_nat.pt?dl=0>`_ (standard training)
-- `ε = 0.25 <https://www.dropbox.com/s/2qsp7pt6t7uo71w/cifar_l2_0_25.pt?dl=0>`_
-- `ε = 0.5 <https://www.dropbox.com/s/1zazwjfzee7c8i4/cifar_l2_0_5.pt?dl=0>`_
-- `ε = 1.0 <https://www.dropbox.com/s/s2x7thisiqxz095/cifar_l2_1_0.pt?dl=0>`_
-
 For each (model, ε-test) combination we evaluate 20-step and 100-step PGD with a
 step size of `2.5 * ε-test / num_steps`. Since these two accuracies are quite 
 close to each other, we do not consider more steps of PGD.
 For each value of ε-test, we highlight the best robust accuracy achieved over
 different ε-train in bold.
 
+(Note that we did not perform any hyperparameter tuning and simply used the same
+hyperparameters as standard training. It is likely that exploring different 
+training hyperparameters will increasse these robust accuracies by a few percent
+points.)
+
+CIFAR10 L2-norm (ResNet50):
+
+- `ε = 0.0 <https://www.dropbox.com/s/yhpp4yws7sgi6lj/cifar_nat.pt?dl=0>`_ (standard training)
+- `ε = 0.25 <https://www.dropbox.com/s/2qsp7pt6t7uo71w/cifar_l2_0_25.pt?dl=0>`_
+- `ε = 0.5 <https://www.dropbox.com/s/1zazwjfzee7c8i4/cifar_l2_0_5.pt?dl=0>`_
+- `ε = 1.0 <https://www.dropbox.com/s/s2x7thisiqxz095/cifar_l2_1_0.pt?dl=0>`_
+
 +--------------+----------------+-----------------+---------------------+---------------------+
-| CIFAR L2-robust accuracy                                                                    |
+| CIFAR10 L2-robust accuracy                                                                  |
 +--------------+----------------+-----------------+---------------------+---------------------+
 |              | ε-train                                                                      |
 +--------------+----------------+-----------------+---------------------+---------------------+
@@ -142,10 +147,69 @@ different ε-train in bold.
 | 2.0          |  0.00% / 0.00% |  0.58% /  0.46% |  5.23% /  4.97%     | **18.59% / 18.05%** |
 +--------------+----------------+-----------------+---------------------+---------------------+
 
-(Note that we did not perform any hyperparameter tuning and simply used the same
-hyperparameters as standard training. It is likely that exploring different 
-training hyperparameters will increasse these robust accuracies by a few percent
-points.)
+CIFAR10 Linf-norm (ResNet50):
+
+- ε = 0.0 (PyTorch pre-trained)
+- `ε = 8/255 <https://www.dropbox.com/s/c9qlt1lbdnu9tlo/cifar_linf_8.pt?dl=0>`_
+
++--------------+-----------------+---------------------+
+| CIFAR10 Linf-robust accuracy                         |
++--------------+-----------------+---------------------+
+|              | ε-train                               |
++--------------+-----------------+---------------------+
+| ε-test       | 0 / 255         | 8 / 255             |
++==============+=================+=====================+
+|  0 / 255     | **95.25% / -**  | 87.03%  / -         |
++--------------+-----------------+---------------------+
+|  8 / 255     |  0.00% /  0.00% | **53.49% / 53.29%** |
++--------------+-----------------+---------------------+
+| 16 / 255     |  0.00% /  0.00% | **18.13% / 17.62%** |
++--------------+-----------------+---------------------+
+
+ImageNet L2-norm (ResNet50):
+
+- ε = 0.0 (PyTorch pre-trained)
+- `ε = 3.0 <https://www.dropbox.com/s/knf4uimlqsi1yz8/imagenet_l2_3_0.pt?dl=0>`_
+
++--------------+-----------------+---------------------+
+| ImageNet L2-robust accuracy                          |
++--------------+-----------------+---------------------+
+|              | ε-train                               |
++--------------+-----------------+---------------------+
+| ε-test       | 0.0             | 3.0                 |
++==============+=================+=====================+
+| 0.0          | **76.13% / -**  | 57.90%  / -         |
++--------------+-----------------+---------------------+
+| 0.5          |  3.35% /  2.98% | **54.42% / 54.42%** |
++--------------+-----------------+---------------------+
+| 1.0          |  0.44% /  0.37% | **50.67% / 50.67%** |
++--------------+-----------------+---------------------+
+| 2.0          |  0.16% /  0.14% | **43.04% / 43.02%** |
++--------------+-----------------+---------------------+
+| 3.0          |  0.13% /  0.12% | **35.16% / 35.09%** |
++--------------+-----------------+---------------------+
+
+ImageNet Linf-norm (ResNet50):
+
+- ε = 0.0 (PyTorch pre-trained)
+- `ε = 4 / 255 <https://www.dropbox.com/s/axfuary2w1cnyrg/imagenet_linf_4.pt?dl=0>`_
+- `ε = 8 / 255 <https://www.dropbox.com/s/yxn15a9zklz3s8q/imagenet_linf_8.pt?dl=0>`_
+
++--------------+-----------------+---------------------+---------------------+
+| ImageNet Linf-robust accuracy                                              |
++--------------+-----------------+---------------------+---------------------+
+|              | ε-train                                                     |
++--------------+-----------------+---------------------+---------------------+
+| ε-test       | 0.0             | 4 / 255             | 8 / 255             |
++==============+=================+=====================+=====================+
+|  0 / 255     | **76.13% / -**  | 62.42%  / -         | 47.91%  / -         |
++--------------+-----------------+---------------------+---------------------+
+|  4 / 255     | 0.04% / 0.03%   | **33.58% / 33.38%** |   33.06% / 33.03%   |
++--------------+-----------------+---------------------+---------------------+
+|  8 / 255     | 0.01% / 0.01%   |   13.13% / 12.73%   | **19.63% / 19.52%** |
++--------------+-----------------+---------------------+---------------------+
+| 16 / 255     | 0.01% / 0.01%   |    1.53% /  1.37%   |  **5.00% /  4.82%** |
++--------------+-----------------+---------------------+---------------------+
 
 Citation
 --------
