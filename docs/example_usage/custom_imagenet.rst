@@ -25,7 +25,38 @@ Here, :samp:`in_path` should point to a folder with the ImageNet
 dataset in ``train`` and ``val`` sub-folders. :samp:`in_info_path`
 should contain the files "wordnet.is_a.txt", "words.txt" and 
 "imagenet_class_index.json" which can be obtained from 
-`here <http://image-net.org/download-API>`_. Then:
+`here <http://image-net.org/download-API>`_. 
+
+You could use the object :samp:`in_hier` to probe the ImageNet hierarchy.
+For example, to see the top 10 synsets in WordNet that have the highest
+number of ImageNet synsets as descendants, you could do:
+
+.. code-block:: python
+
+  for cnt, (wnid, ndesc_in, ndesc_total) in enumerate(in_hier.wnid_sorted):
+      if cnt < 10: 
+          print(f"WordNet ID: {wnid}, Name: {in_hier.wnid_to_name[wnid]}, #ImageNet descendants: {ndesc_in}")
+
+To enumerate all subclasses of a given superclass:
+
+.. code-block:: python
+
+  ancestor_wnid = 'n02120997'
+  print(f"Superclass | WordNet ID: {ancestor_wnid}, Name: {in_hier.wnid_to_name[ancestor_wnid]}")
+
+  for cnt, wnid in enumerate(in_hier.tree['n02120997'].descendants_all):
+      print(f"Subclass | WordNet ID: {wnid}, Name: {in_hier.wnid_to_name[wnid]}")
+
+To enumerate subclasses of a superclass that are a part of ImageNet:
+
+.. code-block:: python
+
+  ancestor_wnid = 'n02120997'
+  print(f"Superclass | WordNet ID: {ancestor_wnid}, Name: {in_hier.wnid_to_name[ancestor_wnid]}")
+  for cnt, wnid in enumerate(in_hier.tree['n02120997'].descendants_all):
+      if wnid in in_hier.in_wnids:
+          print(f"ImageNet subclass | WordNet ID: {wnid}, Name: {in_hier.wnid_to_name[wnid]}")
+
 
 2. To create the desired number of superclass we use 
 py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.get_superclasses`, 
