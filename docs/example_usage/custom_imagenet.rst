@@ -38,10 +38,7 @@ superclasses which should not be further sub-classes :samp:`superclass_lowest`
 has the same number of ImageNet subclasses).
 (see :py:meth:`the docstring 
 <robustness.tools.imagenet_helpers.ImageNetHierarchy.get_superclasses>` for
-more details). This method returns WordNet IDs of chosen superclasses 
-:samp:`superclass_wnid`, sets of ImageNet subclasses to group together
-for each of the superclasses :samp:`class_ranges`, and a mapping from 
-superclass number to its human-interpretable description :samp:`label_map`.
+more details). 
 
 .. code-block:: python
 
@@ -49,6 +46,11 @@ superclass number to its human-interpretable description :samp:`label_map`.
                                                 ancestor_wnid=ancestor_wnid,
                                                 superclass_lowest=superclass_lowest,
                                                 balanced=balanced)                                      
+
+This method returns WordNet IDs of chosen superclasses 
+:samp:`superclass_wnid`, sets of ImageNet subclasses to group together
+for each of the superclasses :samp:`class_ranges`, and a mapping from 
+superclass number to its human-interpretable description :samp:`label_map`.
 
 
 You could also directly provide a list of superclass WordNet IDs :samp:`ancestor_wnid`
