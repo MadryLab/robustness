@@ -27,13 +27,6 @@ should contain the files "wordnet.is_a.txt", "words.txt" and
 "imagenet_class_index.json" which can be obtained from 
 `here <http://image-net.org/download-API>`_. Then:
 
-.. code-block:: python
-
-   superclass_wnid, class_ranges, label_map = in_hier.get_superclasses(n_classes, 
-                                                ancestor_wnid=ancestor_wnid,
-                                                superclass_lowest=superclass_lowest,
-                                                balanced=balanced)                                      
-
 2. To create the desired number of superclass we use 
 py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.get_superclasses`, 
 which takes in the desired number of superclasses :samp:`n_classes`, an
@@ -49,6 +42,14 @@ more details). This method returns WordNet IDs of chosen superclasses
 :samp:`superclass_wnid`, sets of ImageNet subclasses to group together
 for each of the superclasses :samp:`class_ranges`, and a mapping from 
 superclass number to its human-interpretable description :samp:`label_map`.
+
+.. code-block:: python
+
+   superclass_wnid, class_ranges, label_map = in_hier.get_superclasses(n_classes, 
+                                                ancestor_wnid=ancestor_wnid,
+                                                superclass_lowest=superclass_lowest,
+                                                balanced=balanced)                                      
+
 
 You could also directly provide a list of superclass WordNet IDs :samp:`ancestor_wnid`
 that you would like to use to build a custom dataset. For instance, some sample superclass 
@@ -76,8 +77,8 @@ using:
   custom_dataset = datasets.CustomImageNet(in_path, 
                                            class_ranges)
 
-  train_loader, test_loader = dataset.make_loaders(workers=num_workers, 
-                                                   batch_size=batch_size)
+  train_loader, test_loader = custom_dataset.make_loaders(workers=num_workers, 
+                                                          batch_size=batch_size)
 
 You're all set! You can then use this :samp:`custom_dataset` and loaders
 just as you would any other existing/custom dataset in the robustness 

@@ -21,8 +21,8 @@ class Node():
         self.name = name
         self.class_num = -1
         self.parent_wnid = parent_wnid
-        self.descendant_count = 0
-        self.descendant_set = set()
+        self.descendant_count_in = 0
+        self.descendants_all = set()
     
     def add_child(self, child):
         """
@@ -34,10 +34,10 @@ class Node():
         child.parent_wnid = self.wnid
     
     def __str__(self):
-        return f'Name: ({self.name}), ImageNet Class: ({self.class_num}), Descendants: ({self.descendant_count})'
+        return f'Name: ({self.name}), ImageNet Class: ({self.class_num}), Descendants: ({self.descendant_count_in})'
     
     def __repr__(self):
-        return f'Name: ({self.name}), ImageNet Class: ({self.class_num}), Descendants: ({self.descendant_count})'
+        return f'Name: ({self.name}), ImageNet Class: ({self.class_num}), Descendants: ({self.descendant_count_in})'
 
 class ImageNetHierarchy():
     '''
@@ -53,7 +53,9 @@ class ImageNetHierarchy():
 
         """
         self.tree = {}
-        self.load_imagenet_info(ds_path, ds_info_path)
+
+        ret = self.load_imagenet_info(ds_path, ds_info_path)
+        self.in_wnids, self.wnid_to_name, self.wnid_to_num, self.num_to_name = ret
             
         with open(os.path.join(ds_info_path, 'wordnet.is_a.txt'), 'r') as f:
             for line in f.readlines():
@@ -63,25 +65,25 @@ class ImageNetHierarchy():
                 parentNode.add_child(childNode)
                 
         for wnid in self.in_wnids:
-            self.tree[wnid].descendant_count = 0
+            self.tree[wnid].descendant_count_in = 0
             self.tree[wnid].class_num = self.wnid_to_num[wnid]
             
         for wnid in self.in_wnids:
             node = self.tree[wnid]
             while node.parent_wnid is not None:
-                self.tree[node.parent_wnid].descendant_count += 1
-                self.tree[node.parent_wnid].descendant_set.update(node.descendant_set)
-                self.tree[node.parent_wnid].descendant_set.add(node.wnid)
+                self.tree[node.parent_wnid].descendant_count_in += 1
+                self.tree[node.parent_wnid].descendants_all.update(node.descendants_all)
+                self.tree[node.parent_wnid].descendants_all.add(node.wnid)
                 node = self.tree[node.parent_wnid]
         
         del_nodes = [wnid for wnid in self.tree \
-                     if (self.tree[wnid].descendant_count == 0 and self.tree[wnid].class_num == -1)]
+                     if (self.tree[wnid].descendant_count_in == 0 and self.tree[wnid].class_num == -1)]
         for d in del_nodes:
             self.tree.pop(d, None)
                         
-        assert all([k.descendant_count > 0 or k.class_num != -1 for k in self.tree.values()])
+        assert all([k.descendant_count_in > 0 or k.class_num != -1 for k in self.tree.values()])
 
-        self.wnid_sorted = sorted(sorted([(k, v.descendant_count, len(v.descendant_set)) \
+        self.wnid_sorted = sorted(sorted([(k, v.descendant_count_in, len(v.descendants_all)) \
                                         for k, v in self.tree.items()
                                         ],
                                         key=lambda x: x[2], 
@@ -91,7 +93,8 @@ class ImageNetHierarchy():
                                 reverse=True
                                 )
 
-    def load_imagenet_info(self, ds_path, ds_info_path):
+    @staticmethod
+    def load_imagenet_info(ds_path, ds_info_path):
         """
         Get information about mapping between ImageNet wnids/class numbers/class names.
 
@@ -103,17 +106,19 @@ class ImageNetHierarchy():
 
         """
         files = os.listdir(os.path.join(ds_path, 'train'))
-        self.in_wnids = [f for f in files if f[0]=='n'] 
+        in_wnids = [f for f in files if f[0]=='n'] 
 
         f = open(os.path.join(ds_info_path, 'words.txt'))
-        self.wnid_to_name = [l.strip() for l in f.readlines()]
-        self.wnid_to_name = {l.split('\t')[0]: l.split('\t')[1] \
-                             for l in self.wnid_to_name}
+        wnid_to_name = [l.strip() for l in f.readlines()]
+        wnid_to_name = {l.split('\t')[0]: l.split('\t')[1] \
+                             for l in wnid_to_name}
 
         with open(os.path.join(ds_info_path, 'imagenet_class_index.json'), 'r') as f:
             base_map = json.load(f)
-            self.wnid_to_num = {v[0]: int(k) for k, v in base_map.items()}
-            self.num_to_name = {int(k): v[1] for k, v in base_map.items()}
+            wnid_to_num = {v[0]: int(k) for k, v in base_map.items()}
+            num_to_name = {int(k): v[1] for k, v in base_map.items()}
+
+        return in_wnids, wnid_to_name, wnid_to_num, num_to_name
 
     def get_node(self, wnid):
         """
@@ -141,12 +146,8 @@ class ImageNetHierarchy():
         Returns:
             A boolean variable indicating whether or not the node is an ancestor
         """
-        parent = self.tree[child_wnid].parent_wnid
-        while parent is not None:
-            if parent == ancestor_wnid:
-                return True
-            parent = self.tree[parent].parent_wnid
-        return False
+        return (child_wnid in self.tree[ancestor_wnid].descendants_all)
+
     
     def get_descendants(self, node_wnid, in_imagenet=False):
         """
@@ -162,10 +163,10 @@ class ImageNetHierarchy():
             A set of wnids corresponding to all the descendants
         """        
         if in_imagenet:
-            return set([self.wnid_to_num[ww] for ww in self.tree[node_wnid].descendant_set
+            return set([self.wnid_to_num[ww] for ww in self.tree[node_wnid].descendants_all
                         if ww in set(self.in_wnids)])
         else:
-            return self.tree[node_wnid].descendant_set
+            return self.tree[node_wnid].descendants_all
     
     def get_superclasses(self, n_superclasses, 
                          ancestor_wnid=None, superclass_lowest=None, 
@@ -235,7 +236,7 @@ class ImageNetHierarchy():
             label_map (dict): Mapping from class number to human-interpretable description
                             for each superclass
         """      
-        ndesc_min = min([self.tree[w].descendant_count for w in superclass_wnid]) 
+        ndesc_min = min([self.tree[w].descendant_count_in for w in superclass_wnid]) 
         class_ranges, label_map = [], {}
         for ii, w in enumerate(superclass_wnid):
             descendants = self.get_descendants(w, in_imagenet=True)
@@ -273,33 +274,33 @@ def common_superclass_wnid(group_name):
                     'n02401031', # bovid
                     'n01627424', # amphibian
                     ],
-                    
+
         'mixed_10': [
-                         'n02084071', #dog,
-                         'n01503061', #bird 
-                         'n02159955', #insect 
-                         'n02484322', #monkey 
-                         'n02958343', #car 
-                         'n02120997', #feline 
-                         'n04490091', #truck 
-                         'n13134947', #fruit 
-                         'n12992868', #fungus 
-                         'n02858304', #boat 
-                         ],
+                     'n02084071', #dog,
+                     'n01503061', #bird 
+                     'n02159955', #insect 
+                     'n02484322', #monkey 
+                     'n02958343', #car 
+                     'n02120997', #feline 
+                     'n04490091', #truck 
+                     'n13134947', #fruit 
+                     'n12992868', #fungus 
+                     'n02858304', #boat 
+                     ],
 
         'mixed_13': ['n02084071', #dog,
-                         'n01503061', #bird (52)
-                         'n02159955', #insect (27)
-                         'n03405725', #furniture (21)
-                         'n02512053', #fish (16),
-                         'n02484322', #monkey (13)
-                         'n02958343', #car (10)
-                         'n02120997', #feline (8),
-                         'n04490091', #truck (7)
-                         'n13134947', #fruit (7)
-                         'n12992868', #fungus (7)
-                         'n02858304', #boat (6)  
-                         'n03082979', #computer(6)
+                     'n01503061', #bird (52)
+                     'n02159955', #insect (27)
+                     'n03405725', #furniture (21)
+                     'n02512053', #fish (16),
+                     'n02484322', #monkey (13)
+                     'n02958343', #car (10)
+                     'n02120997', #feline (8),
+                     'n04490091', #truck (7)
+                     'n13134947', #fruit (7)
+                     'n12992868', #fungus (7)
+                     'n02858304', #boat (6)  
+                     'n03082979', #computer(6)
                     ]
     }
 
