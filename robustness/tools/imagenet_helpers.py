@@ -301,7 +301,26 @@ def common_superclass_wnid(group_name):
                      'n12992868', #fungus (7)
                      'n02858304', #boat (6)  
                      'n03082979', #computer(6)
-                    ]
+                    ],
+
+        # Dataset from Geirhos et al., 2018: arXiv:1811.12231
+        'geirhos_16': ['n02686568', #aircraft (3)
+                       'n02131653', #bear (3)
+                       'n02834778', #bicycle (2)
+                       'n01503061', #bird (52)
+                       'n02858304', #boat (6)
+                       'n02876657', #bottle (7)
+                       'n02958343', #car (10)
+                       'n02121808', #cat (5)
+                       'n03001627', #char (4)
+                       'n03046257', #clock (3)
+                       'n02084071', #dog (116)
+                       'n02503517', #elephant (2)
+                       'n03614532', #keyboard (3)
+                       'n03623556', #knife (2)
+                       'n03862676', #oven (2)
+                       'n04490091', #truck (7)
+                      ]
     }
 
     if group_name in common_groups:

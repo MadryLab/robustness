@@ -53,7 +53,7 @@ To enumerate subclasses of a superclass that are a part of ImageNet:
 
   ancestor_wnid = 'n02120997'
   print(f"Superclass | WordNet ID: {ancestor_wnid}, Name: {in_hier.wnid_to_name[ancestor_wnid]}")
-  for cnt, wnid in enumerate(in_hier.tree['n02120997'].descendants_all):
+  for cnt, wnid in enumerate(in_hier.tree[ancestor_wnid].descendants_all):
       if wnid in in_hier.in_wnids:
           print(f"ImageNet subclass | WordNet ID: {wnid}, Name: {in_hier.wnid_to_name[wnid]}")
 
@@ -94,7 +94,7 @@ py:meth:`~robustness.tools.imagenet_helpers.ImageNetHierarchy.common_superclass_
 
   from robustness.tools.imagenet_helpers import common_superclass_wnid
 
-  superclass_wnid = common_superclass_wnid('mixed_13')
+  superclass_wnid = common_superclass_wnid('mixed_10')
   class_ranges, label_map = in_hier.get_subclasses(superclass_wnid, 
                                                    balanced=balanced)       
 
