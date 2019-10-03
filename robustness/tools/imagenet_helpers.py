@@ -163,10 +163,10 @@ class ImageNetHierarchy():
             A set of wnids corresponding to all the descendants
         """        
         if in_imagenet:
-            return set([self.wnid_to_num[ww] for ww in self.tree[node_wnid].descendants_all
+            return sorted([self.wnid_to_num[ww] for ww in self.tree[node_wnid].descendants_all
                         if ww in set(self.in_wnids)])
         else:
-            return self.tree[node_wnid].descendants_all
+            return sorted(list(self.tree[node_wnid].descendants_all))
     
     def get_superclasses(self, n_superclasses, 
                          ancestor_wnid=None, superclass_lowest=None, 
