@@ -14,9 +14,9 @@ def get_axis(axarr, H, W, i, j):
         ax = axarr[i][j]
     return ax
 
-def show_image_row(xlist, ylist=None, fontsize=12, tlist=None, filename=None):
+def show_image_row(xlist, ylist=None, fontsize=12, size=(2.5, 2.5), tlist=None, filename=None):
     H, W = len(xlist), len(xlist[0])
-    fig, axarr = plt.subplots(H, W, figsize=(2.5 * W, 2.5 * H))
+    fig, axarr = plt.subplots(H, W, figsize=(size[0] * W, size[1] * H))
     for w in range(W):
         for h in range(H):
             ax = get_axis(axarr, H, W, h, w)                
@@ -34,9 +34,9 @@ def show_image_row(xlist, ylist=None, fontsize=12, tlist=None, filename=None):
     plt.show()
 
 
-def show_image_column(xlist, ylist=None, fontsize=12, tlist=None, filename=None):
+def show_image_column(xlist, ylist=None, fontsize=12, size=(2.5, 2.5), tlist=None, filename=None):
     W, H = len(xlist), len(xlist[0])
-    fig, axarr = plt.subplots(H, W, figsize=(2.5 * W, 2.5 * H))
+    fig, axarr = plt.subplots(H, W, figsize=(size[0] * W, size[1] * H))
     for w in range(W):
         for h in range(H):
             ax = get_axis(axarr, H, W, h, w)

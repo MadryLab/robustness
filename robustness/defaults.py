@@ -35,6 +35,12 @@ TRAINING_DEFAULTS = {
         "weight_decay": 1e-4,
         "step_lr": 50
     },
+    datasets.CustomImageNet: {
+         "epochs": 200,
+         "batch_size": 256,
+         "weight_decay": 1e-4,
+         "step_lr": 50
+    },
     datasets.A2B: {
         "epochs": 150,
         "batch_size": 64,
