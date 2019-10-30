@@ -103,6 +103,8 @@ reference. Functionality provided by the library includes:
    # Train a model
    train.train_model(train_args, m, (train_loader, val_loader), store=out_store)
 
+**Note**: ``robustness`` requires PyTorch to be installed with CUDA support.
+
 Pretrained models
 --------
 
