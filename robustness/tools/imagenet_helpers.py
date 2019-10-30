@@ -333,6 +333,7 @@ def common_superclass_wnid(group_name):
                      'n07555863', #food (24)
                      'n03405725', #furniture (21)
                      'n02469914', #primate (20)
+                   ]
     }
 
     if group_name in common_groups:
