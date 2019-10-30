@@ -320,7 +320,19 @@ def common_superclass_wnid(group_name):
                        'n03623556', #knife (2)
                        'n03862676', #oven (2)
                        'n04490091', #truck (7)
-                      ]
+                      ],
+        'big_12':  ['n02084071', #dog (100+)
+                     'n04341686', #structure (55)
+                     'n01503061', #bird (52)
+                     'n03051540', #clothing (48)
+                     'n04576211', #wheeled vehicle
+                     'n01661091', #reptile, reptilian (36)
+                     'n02075296', #carnivore
+                     'n02159955', #insect (27)
+                     'n03800933', #musical instrument (26)
+                     'n07555863', #food (24)
+                     'n03405725', #furniture (21)
+                     'n02469914', #primate (20)
     }
 
     if group_name in common_groups:
