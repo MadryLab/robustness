@@ -84,7 +84,7 @@ setup(
   #  requirements files see:
   #  https://packaging.python.org/en/latest/requirements.html
   install_requires=['tqdm', 'grpcio', 'psutil', 'gitpython','py3nvml', 'cox',
-		    'scikit-learn', 'seaborn', 'torch', 'torchvision', 'pandas,
+		    'scikit-learn', 'seaborn', 'torch', 'torchvision', 'pandas',
 		    'numpy', 'scipy', 'GPUtil', 'dill', 'tensorboardX', 'tables',
 		    'matplotlib'],
   test_suite='nose.collector',
