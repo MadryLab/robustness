@@ -97,8 +97,8 @@ class DataSet(object):
         raise NotImplementedError
 
     def make_loaders(self, workers, batch_size, data_aug=True, subset=None, 
-                     subset_start=0, subset_type='rand', val_batch_size=None,
-                     only_val=False):
+                 subset_start=0, subset_type='rand', val_batch_size=None,
+                 only_val=False, shuffle_train=True, shuffle_val=True):
         '''
         Args:
             workers (int) : number of workers for data fetching (*required*).
@@ -146,7 +146,9 @@ class DataSet(object):
                                     subset=subset,
                                     subset_start=subset_start,
                                     subset_type=subset_type,
-                                    only_val=only_val)
+                                    only_val=only_val,
+                                    shuffle_train=shuffle_train,
+                                    shuffle_val=shuffle_val)
 
 class ImageNet(DataSet):
     '''
