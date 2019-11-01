@@ -79,10 +79,16 @@ Loading any of these datasets (for example, ``mixed_10``) is relatively simple:
 .. code-block:: python
 
   from robustness import datasets
-  from robustness.tools.imagenet_helpers import common_superclass_wnid
-  
+  from robustness.tools.imagenet_helpers import common_superclass_wnid, ImageNetHierarchy
+ 
+  in_hier = ImageNetHierarchy(in_path, in_info_path)
   superclass_wnid = common_superclass_wnid('mixed_10')
   class_ranges, label_map = in_hier.get_subclasses(superclass_wnid, balanced=True)       
+
+In the above, :samp:`in_path` should point to a folder with the ImageNet
+dataset in ``train`` and ``val`` sub-folders; :samp:`in_info_path` should be the
+path to the directory containing the aforementioned files (``wordnet.is_a.txt``,
+``words.txt``, ``imagenet_class_index.json``).
 
 We can then create a dataset and the corresponding data loader using:
 
@@ -116,7 +122,7 @@ number of superclasses.  We first create an instance of the
    in_hier = ImageNetHierarchy(in_path, in_info_path)
 
 
-Here, :samp:`in_path` should point to a folder with the ImageNet
+Again, :samp:`in_path` should point to a folder with the ImageNet
 dataset in ``train`` and ``val`` sub-folders; :samp:`in_info_path` should be the
 path to the directory containing the aforementioned files (``wordnet.is_a.txt``,
 ``words.txt``, ``imagenet_class_index.json``).
