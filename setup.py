@@ -83,7 +83,10 @@ setup(
   #  your project is installed. For an analysis of "install_requires" vs pip's
   #  requirements files see:
   #  https://packaging.python.org/en/latest/requirements.html
-  install_requires=['tqdm', 'grpcio', 'psutil', 'gitpython','py3nvml'],
+  install_requires=['tqdm', 'grpcio', 'psutil', 'gitpython','py3nvml', 'cox',
+		    'scikit-learn', 'seaborn', 'torch', 'torchvision', 'pandas',
+		    'numpy', 'scipy', 'GPUtil', 'dill', 'tensorboardX', 'tables',
+		    'matplotlib'],
   test_suite='nose.collector',
   tests_require=['nose'],
 )
