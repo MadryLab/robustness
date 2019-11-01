@@ -10,6 +10,10 @@ CLASS_DICT = {
                    2: 'frog', 3: 'turtle', 4: 'bird', 
                    5: 'primate', 6: 'fish', 7: 'crab', 
                    8: 'insect'},
+           'CustomImageNet': {
+               'living_9': {-1: 'noise', 0: 'dog', 1: 'bird', 
+               2: 'arthropod', 3: 'reptile', 4: 'primate',                                5: 'fish', 6: 'cat', 7: 'bovid', 8: 'amphibian'}
+                            },
           # copied from https://gist.github.com/yrevar/942d3a0ac09ec9e5eb3a
           'ImageNet': {
                    -1: 'noise',

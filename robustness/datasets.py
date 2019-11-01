@@ -113,10 +113,16 @@ class DataSet(object):
                 not `None`; "rand" selects the subset randomly, "first"
                 uses the first `subset` images of the training data, and
                 "last" uses the last `subset` images of the training data.
+            seed (int) : only used if `subset == "rand"`; allows one to fix
+                the random seed used to generate the subset (defaults to 1).
             val_batch_size (None|int) : if not `None`, specifies a
                 different batch size for the validation set loader.
             only_val (bool) : If `True`, returns `None` in place of the
                 training data loader
+            shuffle_train (bool) : Whether or not to shuffle the training data
+                in the returned DataLoader.
+            shuffle_val (bool) : Whether or not to shuffle the test data in the
+                returned DataLoader.
 
         Returns:
             A training loader and validation loader according to the
@@ -212,6 +218,41 @@ class RestrictedImageNet(DataSet):
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
         super(RestrictedImageNet, self).__init__(ds_name,
+                data_path, **ds_kwargs)
+
+    def get_model(self, arch, pretrained):
+        """
+        """
+        if pretrained:
+            raise ValueError("Dataset doesn't support pytorch_pretrained")
+        return imagenet_models.__dict__[arch](num_classes=self.num_classes)
+
+class CustomImageNet(DataSet):
+    '''
+    CustomImagenet Dataset 
+
+    A subset of ImageNet with the user-specified labels
+
+    To initialize, just provide the path to the full ImageNet dataset
+    along with a list of lists of wnids to be grouped together
+    (no special formatting required).
+
+    '''
+    def __init__(self, data_path, custom_grouping, **kwargs):
+        """
+        """
+        ds_name = 'custom_imagenet'
+        ds_kwargs = {
+            'num_classes': len(custom_grouping),
+            'mean': ch.tensor([0.4717, 0.4499, 0.3837]), 
+            'std': ch.tensor([0.2600, 0.2516, 0.2575]),
+            'custom_class': None,
+            'label_mapping': get_label_mapping(ds_name,
+                custom_grouping),
+            'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
+            'transform_test': da.TEST_TRANSFORMS_IMAGENET
+        }
+        super(CustomImageNet, self).__init__(ds_name,
                 data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
@@ -340,6 +381,7 @@ class A2B(DataSet):
 DATASETS = {
     'imagenet': ImageNet,
     'restricted_imagenet': RestrictedImageNet,
+    'custom_imagenet': CustomImageNet,
     'cifar': CIFAR,
     'cinic': CINIC,
     'a2b': A2B

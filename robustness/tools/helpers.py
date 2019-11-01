@@ -184,6 +184,9 @@ def get_label_mapping(dataset_name, ranges):
     elif dataset_name == 'restricted_imagenet':
         def label_mapping(classes, class_to_idx):
             return restricted_label_mapping(classes, class_to_idx, ranges=ranges)
+    elif dataset_name == 'custom_imagenet':
+        def label_mapping(classes, class_to_idx):
+            return custom_label_mapping(classes, class_to_idx, ranges=ranges)
     else:
         raise ValueError('No such dataset_name %s' % dataset_name)
 
@@ -202,5 +205,16 @@ def restricted_label_mapping(classes, class_to_idx, ranges):
             if idx in range_set:
                 mapping[class_name] = new_idx
         # assert class_name in mapping
+    filtered_classes = list(mapping.keys()).sort()
+    return filtered_classes, mapping
+
+def custom_label_mapping(classes, class_to_idx, ranges):
+
+    mapping = {}
+    for class_name, idx in class_to_idx.items():
+        for new_idx, range_set in enumerate(ranges):
+            if idx in range_set:
+                mapping[class_name] = new_idx
+
     filtered_classes = list(mapping.keys()).sort()
     return filtered_classes, mapping

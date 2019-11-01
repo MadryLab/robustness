@@ -133,6 +133,8 @@ Walkthroughs
    example_usage/input_space_manipulation
    example_usage/training_lib_part_1
    example_usage/training_lib_part_2
+   example_usage/custom_imagenet
+   example_usage/changelog
 
 API Reference
 -------------

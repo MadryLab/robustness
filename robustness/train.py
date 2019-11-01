@@ -1,4 +1,5 @@
 import torch as ch
+import numpy as np
 import torch.nn as nn
 from torch.optim import SGD, lr_scheduler
 from torchvision.utils import make_grid
@@ -50,7 +51,7 @@ def check_required_args(args, eval_only=False):
         raise ValueError("Cannot use custom train loss \
             without a custom adversarial loss (see docs)")
 
-def make_optimizer_and_schedule(args, model, checkpoint):
+def make_optimizer_and_schedule(args, model, checkpoint, params):
     """
     *Internal Function* (called directly from train_model)
 
@@ -63,18 +64,25 @@ def make_optimizer_and_schedule(args, model, checkpoint):
         model (AttackerModel) : the model to create the optimizer for
         checkpoint (dict) : a loaded checkpoint saved by this library and loaded
             with `ch.load`
+        params (list|None) : a list of parameters that should be updatable, all
+            other params will not update. If ``None``, update all params 
 
     Returns:
         An optimizer (ch.nn.optim.Optimizer) and a scheduler
             (ch.nn.optim.lr_schedulers module).
     """
     # Make optimizer
-    optimizer = SGD(model.parameters(), args.lr, momentum=args.momentum,
+    param_list = model.parameters() if params is None else params
+    optimizer = SGD(param_list, args.lr, momentum=args.momentum,
                                 weight_decay=args.weight_decay)
     # Make schedule
     schedule = None
     if args.step_lr:
         schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr)
+    elif args.custom_schedule == 'cyclic':
+        eps = args.epochs
+        lr_func = lambda t: np.interp([t], [0, eps*2//5, eps], [0, args.lr, 0])[0]
+        schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
     elif args.custom_schedule:
         cs = args.custom_schedule
         periods = eval(cs) if type(cs) is str else cs
@@ -141,8 +149,10 @@ def eval_model(args, model, loader, store):
 
     # Log info into the logs table
     if store: store[consts.LOGS_TABLE].append_row(log_info)
+    return log_info
 
-def train_model(args, model, loaders, *, checkpoint=None, store=None):
+def train_model(args, model, loaders, *, checkpoint=None, 
+                store=None, update_params=None):
     """
     Main function for training a model. 
 
@@ -223,6 +233,9 @@ def train_model(args, model, loaders, *, checkpoint=None, store=None):
         checkpoint (dict) : a loaded checkpoint previously saved by this library
             (if resuming from checkpoint)
         store (cox.Store) : a cox store for logging training progress
+        train_params (list) : list of parameters to use for training, if None
+            then all parameters in the model are used (useful for transfer
+            learning)
     """
     # Logging setup
     writer = store.tensorboard if store else None
@@ -237,7 +250,7 @@ def train_model(args, model, loaders, *, checkpoint=None, store=None):
 
     # Initial setup
     train_loader, val_loader = loaders
-    opt, schedule = make_optimizer_and_schedule(args, model, checkpoint)
+    opt, schedule = make_optimizer_and_schedule(args, model, checkpoint, update_params)
 
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
@@ -377,7 +390,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             'eps': eps,
             'step_size': args.attack_lr,
             'iterations': args.attack_steps,
-            'random_start': False,
+            'random_start': args.random_start,
             'custom_loss': adv_criterion,
             'random_restarts': random_restarts,
             'use_best': bool(args.use_best)

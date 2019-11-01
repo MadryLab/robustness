@@ -24,16 +24,22 @@ TRAINING_DEFAULTS = {
         "step_lr": 50
     },
     datasets.ImageNet: {
-        "epochs": 350,
+        "epochs": 200,
         "batch_size":256,
         "weight_decay":1e-4,
-        "step_lr": 150
+        "step_lr": 50
     },
     datasets.RestrictedImageNet: {
         "epochs": 150,
         "batch_size": 256,
         "weight_decay": 1e-4,
         "step_lr": 50
+    },
+    datasets.CustomImageNet: {
+         "epochs": 200,
+         "batch_size": 256,
+         "weight_decay": 1e-4,
+         "step_lr": 50
     },
     datasets.A2B: {
         "epochs": 150,
@@ -75,6 +81,7 @@ PGD_ARGS = [
     ['attack-lr', str, 'step size for PGD', REQ],
     ['use-best', [0, 1], 'if 1 (0) use best (final) PGD step as example', 1],
     ['random-restarts', int, 'number of random PGD restarts for eval', 0],
+    ['random-start', [0, 1], 'start with random noise instead of pgd step', 0],
     ['eps-fadein-epochs', int, 'fade in eps over this many iterations', 0],
 ]
 """
