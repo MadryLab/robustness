@@ -113,10 +113,16 @@ class DataSet(object):
                 not `None`; "rand" selects the subset randomly, "first"
                 uses the first `subset` images of the training data, and
                 "last" uses the last `subset` images of the training data.
+            seed (int) : only used if `subset == "rand"`; allows one to fix
+                the random seed used to generate the subset (defaults to 1).
             val_batch_size (None|int) : if not `None`, specifies a
                 different batch size for the validation set loader.
             only_val (bool) : If `True`, returns `None` in place of the
                 training data loader
+            shuffle_train (bool) : Whether or not to shuffle the training data
+                in the returned DataLoader.
+            shuffle_val (bool) : Whether or not to shuffle the test data in the
+                returned DataLoader.
 
         Returns:
             A training loader and validation loader according to the
