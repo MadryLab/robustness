@@ -106,7 +106,7 @@ reference. Functionality provided by the library includes:
 **Note**: ``robustness`` requires PyTorch to be installed with CUDA support.
 
 Pretrained models
---------
+-----------------
 
 Along with the training code, we release a number of pretrained models for
 different datasets, norms and ε-train values. This list will be updated as

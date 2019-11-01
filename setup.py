@@ -22,10 +22,11 @@ setup(
   # Versions should comply with PEP440.  For a discussion on single-sourcing
   # the version across setup.py and the project code, see
   # https://packaging.python.org/en/latest/single_source_version.html
-  version='1.0.post1',
+  version='1.1',
 
   description='Tools for Robustness',
   long_description=long_description,
+  long_description_content_type='text/x-rst',
 
   # The project's main homepage.
   #url='https://github.com/',
