@@ -51,7 +51,7 @@ def check_required_args(args, eval_only=False):
         raise ValueError("Cannot use custom train loss \
             without a custom adversarial loss (see docs)")
 
-def make_optimizer_and_schedule(args, model, checkpoint):
+def make_optimizer_and_schedule(args, model, checkpoint, params):
     """
     *Internal Function* (called directly from train_model)
 
@@ -64,13 +64,16 @@ def make_optimizer_and_schedule(args, model, checkpoint):
         model (AttackerModel) : the model to create the optimizer for
         checkpoint (dict) : a loaded checkpoint saved by this library and loaded
             with `ch.load`
+        params (list|None) : a list of parameters that should be updatable, all
+            other params will not update. If ``None``, update all params 
 
     Returns:
         An optimizer (ch.nn.optim.Optimizer) and a scheduler
             (ch.nn.optim.lr_schedulers module).
     """
     # Make optimizer
-    optimizer = SGD(model.parameters(), args.lr, momentum=args.momentum,
+    param_list = model.parameters() if params is None else params
+    optimizer = SGD(param_list, args.lr, momentum=args.momentum,
                                 weight_decay=args.weight_decay)
     # Make schedule
     schedule = None
@@ -146,8 +149,10 @@ def eval_model(args, model, loader, store):
 
     # Log info into the logs table
     if store: store[consts.LOGS_TABLE].append_row(log_info)
+    return log_info
 
-def train_model(args, model, loaders, *, checkpoint=None, store=None):
+def train_model(args, model, loaders, *, checkpoint=None, 
+                store=None, update_params=None):
     """
     Main function for training a model. 
 
@@ -228,6 +233,9 @@ def train_model(args, model, loaders, *, checkpoint=None, store=None):
         checkpoint (dict) : a loaded checkpoint previously saved by this library
             (if resuming from checkpoint)
         store (cox.Store) : a cox store for logging training progress
+        train_params (list) : list of parameters to use for training, if None
+            then all parameters in the model are used (useful for transfer
+            learning)
     """
     # Logging setup
     writer = store.tensorboard if store else None
@@ -242,7 +250,7 @@ def train_model(args, model, loaders, *, checkpoint=None, store=None):
 
     # Initial setup
     train_loader, val_loader = loaders
-    opt, schedule = make_optimizer_and_schedule(args, model, checkpoint)
+    opt, schedule = make_optimizer_and_schedule(args, model, checkpoint, update_params)
 
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
