@@ -89,7 +89,7 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
         def lr_func(ep):
             for (milestone, lr) in reversed(periods):
                 if ep > milestone: return lr/args.lr
-            return args.lr
+            return args.lr/args.lr
         schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
     
     # Fast-forward the optimizer and the scheduler if resuming
