@@ -18,6 +18,11 @@ if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
 else:
     from tqdm import tqdm as tqdm
 
+try:
+    from apex import amp
+except Exception as e:
+    pass
+
 def check_required_args(args, eval_only=False):
     """
     Check that the required training arguments are present.
@@ -51,6 +56,7 @@ def check_required_args(args, eval_only=False):
         raise ValueError("Cannot use custom train loss \
             without a custom adversarial loss (see docs)")
 
+
 def make_optimizer_and_schedule(args, model, checkpoint, params):
     """
     *Internal Function* (called directly from train_model)
@@ -75,23 +81,28 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     param_list = model.parameters() if params is None else params
     optimizer = SGD(param_list, args.lr, momentum=args.momentum,
                                 weight_decay=args.weight_decay)
+
+    if args.mixed_precision:
+        model.to('cuda')
+        model, optimizer = amp.initialize(model, optimizer, 'O1')
+
     # Make schedule
     schedule = None
-    if args.step_lr:
-        schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr)
-    elif args.custom_schedule == 'cyclic':
+    if args.custom_lr_multiplier == 'cyclic':
         eps = args.epochs
         lr_func = lambda t: np.interp([t], [0, eps*2//5, eps], [0, args.lr, 0])[0]
         schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
-    elif args.custom_schedule:
-        cs = args.custom_schedule
+    elif args.custom_lr_multiplier:
+        cs = args.custom_lr_multiplier
         periods = eval(cs) if type(cs) is str else cs
         def lr_func(ep):
             for (milestone, lr) in reversed(periods):
-                if ep > milestone: return lr/args.lr
-            return args.lr
+                if ep >= milestone: return lr
+            return 1.0
         schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
-    
+    elif args.step_lr:
+        schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr)
+
     # Fast-forward the optimizer and the scheduler if resuming
     if checkpoint:
         optimizer.load_state_dict(checkpoint['optimizer'])
@@ -103,6 +114,14 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
                   f' Stepping {steps_to_take} times instead...')
             for i in range(steps_to_take):
                 schedule.step()
+        
+        if 'amp' in checkpoint:
+            amp.load_state_dict(checkpoint['amp'])
+
+        # TODO: see if there's a smarter way to do this
+        # TODO: see what's up with loading fp32 weights and then MP training
+        if args.mixed_precision:
+            model.load_state_dict(checkpoint['model'])
 
     return optimizer, schedule
 
@@ -125,6 +144,7 @@ def eval_model(args, model, loader, store):
         store.add_table(consts.LOGS_TABLE, consts.LOGS_SCHEMA)
     writer = store.tensorboard if store else None
 
+    assert not hasattr(model, "module"), "model is already in DataParallel."
     model = ch.nn.DataParallel(model)
 
     prec1, nat_loss = _model_loop(args, 'val', loader, 
@@ -152,7 +172,8 @@ def eval_model(args, model, loader, store):
     return log_info
 
 def train_model(args, model, loaders, *, checkpoint=None, 
-                store=None, update_params=None):
+                store=None, update_params=None, optimizer=None,
+                scheduler=None):
     """
     Main function for training a model. 
 
@@ -255,7 +276,8 @@ def train_model(args, model, loaders, *, checkpoint=None,
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
-        best_prec1 = checkpoint[f"{'adv' if args.adv_train else 'nat'}_prec1"]
+        s = f"{'adv' if args.adv_train else 'nat'}_prec1"
+        best_prec1 = checkpoint[s] if s in checkpoint else 0.0
 
     # Put the model into parallel mode
     assert not hasattr(model, "module"), "model is already in DataParallel."
@@ -277,6 +299,8 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'schedule':(schedule and schedule.state_dict()),
             'epoch': epoch+1
         }
+
+        if args.mixed_precision: sd_info['amp'] = amp.state_dict()
 
         def save_checkpoint(filename):
             ckpt_save_path = os.path.join(args.out_dir if not store else \
@@ -432,7 +456,11 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
         # compute gradient and do SGD step
         if is_train:
             opt.zero_grad()
-            loss.backward()
+            if args.mixed_precision:
+                with amp.scale_loss(loss, opt) as sl:
+                    sl.backward()
+            else:
+                loss.backward()
             opt.step()
         elif adv and i == 0 and writer:
             # add some examples to the tensorboard

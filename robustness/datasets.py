@@ -182,6 +182,36 @@ class ImageNet(DataSet):
         return imagenet_models.__dict__[arch](num_classes=self.num_classes, 
                                         pretrained=pretrained)
 
+class Places365(DataSet):
+    '''
+    Places365 Dataset [ZLK+17]_, a 365-class scene recognition dataset.
+
+    See `the places2 webpage <http://places2.csail.mit.edu>`_
+    for information on how to download this dataset.
+
+    .. [ZLK+17] Zhou, B., Lapedriza, A., Khosla, A., Oliva, A., & Torralba, A.  (2017). Places: A 10 million Image Database for Scene Recognition. IEEE Transactions on Pattern Analysis and Machine Intelligence.
+
+    '''
+    def __init__(self, data_path, **kwargs):
+        """
+        """
+        ds_kwargs = {
+            'num_classes': 365,
+            'mean': ch.tensor([0.485, 0.456, 0.406]),
+            'std': ch.tensor([0.229, 0.224, 0.225]),
+            'custom_class': None,
+            'label_mapping': None, 
+            'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(256),
+            'transform_test': da.TEST_TRANSFORMS_DEFAULT(256)
+        }
+        super(Places365, self).__init__('places365', data_path, **ds_kwargs)
+
+    def get_model(self, arch, pretrained):
+        """
+        """
+        return imagenet_models.__dict__[arch](num_classes=self.num_classes, 
+                                        pretrained=pretrained)
+
 class RestrictedImageNet(DataSet):
     '''
     RestrictedImagenet Dataset [TSE+19]_
@@ -386,7 +416,8 @@ DATASETS = {
     'custom_imagenet': CustomImageNet,
     'cifar': CIFAR,
     'cinic': CINIC,
-    'a2b': A2B
+    'a2b': A2B,
+    'places365': Places365
 }
 '''
 Dictionary of datasets. A dataset class can be accessed as:

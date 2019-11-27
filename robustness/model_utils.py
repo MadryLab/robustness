@@ -42,7 +42,7 @@ class FeatureExtractor(ch.nn.Module):
         return [out] + activs
 
 def make_and_restore_model(*_, arch, dataset, resume_path=None,
-         parallel=True, pytorch_pretrained=False):
+         parallel=True, pytorch_pretrained=False, half_prec=False):
     """
     Makes a model and (optionally) restores it from a checkpoint.
 

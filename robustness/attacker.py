@@ -42,7 +42,8 @@ STEPS = {
     'inf': attack_steps.LinfStep,
     '2': attack_steps.L2Step,
     'unconstrained': attack_steps.UnconstrainedStep,
-    'fourier': attack_steps.FourierStep
+    'fourier': attack_steps.FourierStep,
+    'random_smooth': attack_steps.RandomStep
 }
 
 class Attacker(ch.nn.Module):
@@ -71,7 +72,8 @@ class Attacker(ch.nn.Module):
     def forward(self, x, target, *_, constraint, eps, step_size, iterations,
                 random_start=False, random_restarts=False, do_tqdm=False,
                 targeted=False, custom_loss=None, should_normalize=True,
-                orig_input=None, use_best=True, return_image=True, est_grad=None):
+                orig_input=None, use_best=True, return_image=True,
+                est_grad=None, mixed_precision=False):
         """
         Implementation of forward (finds adversarial examples). Note that
         this does **not** perform inference and should not be called
@@ -118,6 +120,8 @@ class Attacker(ch.nn.Module):
                 :math:`\\nabla_x f(x) \\approx \\sum_{i=0}^N f(x + R\\cdot
                 \\vec{\\delta_i})\\cdot \\vec{\\delta_i}`, where
                 :math:`\delta_i` are randomly sampled from the unit ball.
+            mixed_precision (bool) : if True, use mixed-precision calculations
+                to compute the adversarial examples / do the inference.
         Returns:
             An adversarial example for x (i.e. within a feasible set
             determined by `eps` and `constraint`, but classified as:
@@ -192,7 +196,12 @@ class Attacker(ch.nn.Module):
                 loss = ch.mean(losses)
 
                 if step.use_grad:
-                    if est_grad is None:
+                    if (est_grad is None) and mixed_precision:
+                        with amp.scale_loss(loss, []) as sl:
+                            sl.backward()
+                        grad = x.grad.detach()
+                        x.grad.zero_()
+                    elif (est_grad is None):
                         grad, = ch.autograd.grad(m * loss, [x])
                     else:
                         f = lambda _x, _y: m * calc_loss(step.to_image(_x), _y)[0]

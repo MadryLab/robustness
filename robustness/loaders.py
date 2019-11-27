@@ -64,7 +64,7 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
         test_set = custom_class(root=data_path, train=False, 
                                     download=True, transform=transform_test)
 
-    if subset is not None:
+    if (subset is not None) and (subset <= len(train_set.samples)):
         assert not only_val
         try:
             train_sample_count = len(train_set.samples)

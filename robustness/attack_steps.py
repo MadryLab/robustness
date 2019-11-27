@@ -180,3 +180,26 @@ class FourierStep(AttackerStep):
         """
         """
         return ch.sigmoid(ch.irfft(x, 2, normalized=True, onesided=False))
+
+class RandomStep(AttackerStep):
+    """
+    Step for Randomized Smoothing.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.use_grad = False
+
+    def project(self, x):
+        """
+        """
+        return x
+
+    def step(self, x, g):
+        """
+        """
+        return x + self.step_size * ch.randn_like(x)
+
+    def random_perturb(self, x):
+        """
+        """
+        return x

@@ -3,8 +3,6 @@ import numpy as np
 import json
 from itertools import product
 
-
-
 class Node():
     '''
     Class for representing a node in the ImageNet/WordNet hierarchy. 
