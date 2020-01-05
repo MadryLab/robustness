@@ -133,7 +133,6 @@ class Attacker(ch.nn.Module):
             from the unit ball, and then use :math:`\delta_{N/2+i} =
             -\delta_{i}`.
         """
-
         # Can provide a different input to make the feasible set around
         # instead of the initial point
         if orig_input is None: orig_input = x.detach()
@@ -143,7 +142,7 @@ class Attacker(ch.nn.Module):
         m = -1 if targeted else 1
 
         # Initialize step class and attacker criterion
-        criterion = ch.nn.CrossEntropyLoss(reduction='none').cuda()
+        criterion = ch.nn.CrossEntropyLoss(reduction='none')
         step_class = STEPS[constraint] if isinstance(constraint, str) else constraint
         step = step_class(eps=eps, orig_input=orig_input, step_size=step_size) 
 

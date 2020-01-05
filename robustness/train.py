@@ -90,15 +90,18 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     schedule = None
     if args.custom_lr_multiplier == 'cyclic':
         eps = args.epochs
-        lr_func = lambda t: np.interp([t], [0, eps*2//5, eps], [0, args.lr, 0])[0]
+        lr_func = lambda t: np.interp([t], [0, eps*4//15, eps], [0, 1, 0])[0]
         schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
     elif args.custom_lr_multiplier:
         cs = args.custom_lr_multiplier
         periods = eval(cs) if type(cs) is str else cs
-        def lr_func(ep):
-            for (milestone, lr) in reversed(periods):
-                if ep >= milestone: return lr
-            return 1.0
+        if args.lr_interpolation == 'linear':
+            lr_func = lambda t: np.interp([t], *zip(*periods))[0]
+        else:
+            def lr_func(ep):
+                for (milestone, lr) in reversed(periods):
+                    if ep >= milestone: return lr
+                return 1.0
         schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
     elif args.step_lr:
         schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr)
@@ -297,10 +300,10 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'model':model.state_dict(),
             'optimizer':opt.state_dict(),
             'schedule':(schedule and schedule.state_dict()),
-            'epoch': epoch+1
+            'epoch': epoch+1,
+            'amp': amp.state_dict() if args.mixed_precision else "N/A"
         }
 
-        if args.mixed_precision: sd_info['amp'] = amp.state_dict()
 
         def save_checkpoint(filename):
             ckpt_save_path = os.path.join(args.out_dir if not store else \

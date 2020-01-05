@@ -64,12 +64,14 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
         test_set = custom_class(root=data_path, train=False, 
                                     download=True, transform=transform_test)
 
-    if (subset is not None) and (subset <= len(train_set.samples)):
+    if not only_val:
+        attrs = ["samples", "train_data", "data"]
+        vals = {attr: hasattr(train_set, attr) for attr in attrs}
+        assert any(vals.values()), f"dataset must expose one of {attrs}"
+        train_sample_count = len([k for k in vals if vals[k]][0])
+
+    if (not only_val) and (subset is not None) and (subset <= train_sample_count):
         assert not only_val
-        try:
-            train_sample_count = len(train_set.samples)
-        except:
-            train_sample_count = len(train_set.train_data)
         if subset_type == 'rand':
             rng = np.random.RandomState(seed)
             subset = rng.choice(list(range(train_sample_count)), size=subset+subset_start, replace=False)

@@ -67,6 +67,7 @@ TRAINING_ARGS = [
     ['momentum', float, 'SGD momentum parameter', 0.9],
     ['step-lr', int, 'number of steps between 10x LR drops', BY_DATASET],
     ['custom-lr-multiplier', str, 'LR sched (format: [(epoch, LR),...])', None],
+    ['lr-interpolation', ["linear", "step"], 'Drop LR as step function or linearly', "step"],
     ['adv-train', [0, 1], 'whether to train adversarially', REQ],
     ['adv-eval', [0, 1], 'whether to adversarially evaluate', None], 
     ['log-iters', int, 'how frequently (in epochs) to log', 5],

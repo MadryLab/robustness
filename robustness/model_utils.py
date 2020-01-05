@@ -1,4 +1,5 @@
 import torch as ch
+from torch import nn
 import dill
 import os
 from .tools import helpers, constants
@@ -41,8 +42,16 @@ class FeatureExtractor(ch.nn.Module):
         activs = [layer_fn(self.submod).activations for layer_fn in self.layers]
         return [out] + activs
 
+class DummyModel(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, x, *args, **kwargs):
+        return self.model(x)
+
 def make_and_restore_model(*_, arch, dataset, resume_path=None,
-         parallel=True, pytorch_pretrained=False, half_prec=False):
+         parallel=True, pytorch_pretrained=False, add_custom_forward=False):
     """
     Makes a model and (optionally) restores it from a checkpoint.
 
@@ -50,14 +59,28 @@ def make_and_restore_model(*_, arch, dataset, resume_path=None,
         arch (str|nn.Module): Model architecture identifier or otherwise a
             torch.nn.Module instance with the classifier
         dataset (Dataset class [see datasets.py])
-        resume_path (str): optional path to checkpoint
+        resume_path (str): optional path to checkpoint saved with the 
+            robustness library (ignored if ``arch`` is not a string)
+        not a string
         parallel (bool): if True, wrap the model in a DataParallel 
             (default True, recommended)
         pytorch_pretrained (bool): if True, try to load a standard-trained 
             checkpoint from the torchvision library (throw error if failed)
+        add_custom_forward (bool): ignored unless arch is an instance of
+            nn.Module (and not a string). Normally, architectures should have a
+            forward() function which accepts arguments ``with_latent``,
+            ``fake_relu``, and ``no_relu`` to allow for adversarial manipulation
+            (see `here`<https://robustness.readthedocs.io/en/latest/example_usage/training_lib_part_2.html#training-with-custom-architectures>
+            for more info). If this argument is True, then these options will
+            not be passed to forward(). (Useful if you just want to train a
+            model and don't care about these arguments, and are passing in an
+            arch that you don't want to edit forward() for, e.g.  a pretrained model)
     Returns: 
         A tuple consisting of the model (possibly loaded with checkpoint), and the checkpoint itself
     """
+    if (not isinstance(arch, str)) and add_custom_forward:
+        arch = DummyModel(arch)
+
     classifier_model = dataset.get_model(arch, pytorch_pretrained) if \
                             isinstance(arch, str) else arch
 
