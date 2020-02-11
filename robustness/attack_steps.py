@@ -131,7 +131,7 @@ class L2Step(AttackerStep):
     def random_perturb(self, x):
         """
         """
-        new_x = x + (ch.rand_like(x) - 0.5).renorm(p=2, dim=1, maxnorm=self.eps)
+        new_x = x + (ch.rand_like(x) - 0.5).renorm(p=2, dim=0, maxnorm=self.eps)
         return ch.clamp(new_x, 0, 1)
 
 # Unconstrained threat model
@@ -152,7 +152,7 @@ class UnconstrainedStep(AttackerStep):
     def random_perturb(self, x):
         """
         """
-        new_x = x + (ch.rand_like(x) - 0.5).renorm(p=2, dim=1, maxnorm=step_size)
+        new_x = x + (ch.rand_like(x) - 0.5).renorm(p=2, dim=0, maxnorm=step_size)
         return ch.clamp(new_x, 0, 1)
 
 class FourierStep(AttackerStep):
