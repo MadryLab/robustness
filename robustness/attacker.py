@@ -174,7 +174,7 @@ class Attacker(ch.nn.Module):
             def replace_best(loss, bloss, x, bx):
                 if bloss is None:
                     bx = x.clone().detach()
-                    bloss = losses.clone().detach()
+                    bloss = loss.clone().detach()
                 else:
                     replace = m * bloss < m * loss
                     bx[replace] = x[replace].clone().detach()
