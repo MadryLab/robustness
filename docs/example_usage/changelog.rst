@@ -1,6 +1,9 @@
 CHANGELOG
 =========
 
+robustness 1.1.post2
+- Critical fix in :meth:`robustness.loaders.TransformedLoader`, allow for data shuffling
+
 robustness 1.1
 ''''''''''''''
 - Added ability to superclass ImageNet to make 

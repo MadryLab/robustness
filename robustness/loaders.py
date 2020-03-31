@@ -184,7 +184,8 @@ class LambdaLoader:
         return getattr(self.data_loader, attr)
 
 def TransformedLoader(loader, func, transforms, workers=None, 
-        batch_size=None, do_tqdm=False, augment=False, fraction=1.0):
+        batch_size=None, do_tqdm=False, augment=False, fraction=1.0,
+        shuffle=True):
     '''
     This is a function that allows one to apply any given (fixed) 
     transformation to the output from the loader *once*. 
@@ -214,6 +215,8 @@ def TransformedLoader(loader, func, transforms, workers=None,
         fraction (float): fraction of image-label pairs in the output loader 
             which are transformed. The remainder is just original image-label 
             pairs from loader. 
+        shuffle (bool) : whether or not the resulting loader should shuffle every 
+            epoch (defaults to True)
 
     Returns:
         A loader and validation loader according to the
@@ -245,4 +248,4 @@ def TransformedLoader(loader, func, transforms, workers=None,
 
     dataset = folder.TensorDataset(ch.cat(new_ims, 0), ch.cat(new_targs, 0), transform=transforms)
     return ch.utils.data.DataLoader(dataset, num_workers=workers, 
-                                    batch_size=batch_size)
+                        batch_size=batch_size, shuffle=shuffle)
