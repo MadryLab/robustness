@@ -82,7 +82,7 @@ PGD_ARGS = [
     ['use-best', [0, 1], 'if 1 (0) use best (final) PGD step as example', 1],
     ['random-restarts', int, 'number of random PGD restarts for eval', 0],
     ['random-start', [0, 1], 'start with random noise instead of pgd step', 0],
-    ['eps-fadein-epochs', int, 'fade in eps over this many iterations', 0],
+    ['eps-fadein-epochs', int, 'fade in eps over this many iterations', 0]
 ]
 """
 Arguments essential for the :meth:`robustness.train.train_model` function if

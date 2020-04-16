@@ -18,7 +18,8 @@ class AttackerStep:
     specified by an "origin input" and a perturbation magnitude.
     Must implement project, step, and random_perturb
     '''
-    def __init__(self, orig_input, eps, step_size, use_grad=True):
+    def __init__(self, orig_input, eps, step_size, 
+                instance_attack_function, use_grad=True):
         '''
         Initialize the attacker step with a given perturbation magnitude.
 
@@ -30,8 +31,9 @@ class AttackerStep:
         self.eps = eps
         self.step_size = step_size
         self.use_grad = use_grad
+        self.instance_attack_function = instance_attack_function
 
-    def project(self, x):
+    def project(self, x, target=None, prediction=None):
         '''
         Given an input x, project it back into the feasible set
 
@@ -45,7 +47,7 @@ class AttackerStep:
         '''
         raise NotImplementedError
 
-    def step(self, x, g):
+    def step(self, x, g, target=None, prediction=None):
         '''
         Given a gradient, make the appropriate step according to the
         perturbation constraint (e.g. dual norm maximization for :math:`\ell_p`
@@ -59,7 +61,7 @@ class AttackerStep:
         '''
         raise NotImplementedError
 
-    def random_perturb(self, x):
+    def random_perturb(self, x, target=None, prediction=None):
         '''
         Given a starting input, take a random step within the feasible set
         '''
@@ -112,26 +114,48 @@ class L2Step(AttackerStep):
 
     .. math:: S = \{x | \|x - x_0\|_2 \leq \epsilon\}
     """
-    def project(self, x):
+    def project(self, x, target=None, prediction=None):
         """
         """
         diff = x - self.orig_input
-        diff = diff.renorm(p=2, dim=0, maxnorm=self.eps)
+
+        # Allow for per instance eps
+        if self.instance_attack_function is None: 
+            diff = diff.renorm(p=2, dim=0, maxnorm=self.eps)
+        else:
+            eps_use, _ = self.instance_attack_function(x, target, prediction)
+            diff = ch.cat([diff[idx:idx+1].renorm(p=2, dim=0, maxnorm=self.eps * eps_use[idx]) \
+                          for idx in range(len(diff))])
         return ch.clamp(self.orig_input + diff, 0, 1)
 
-    def step(self, x, g):
+    def step(self, x, g, target=None, prediction=None):
         """
         """
         # Scale g so that each element of the batch is at least norm 1
         l = len(x.shape) - 1
         g_norm = ch.norm(g.view(g.shape[0], -1), dim=1).view(-1, *([1]*l))
         scaled_g = g / (g_norm + 1e-10)
-        return x + scaled_g * self.step_size
 
-    def random_perturb(self, x):
+        if self.instance_attack_function is None: 
+            return x + scaled_g * self.step_size
+        else:
+            _, step_use = self.instance_attack_function(x, target, prediction)
+            step_size = ch.tensor(self.step_size * step_use)
+            step_size = step_size[:, None, None, None].to(scaled_g.device,
+                                                          dtype=scaled_g.dtype)
+            return x + scaled_g * step_size
+
+    def random_perturb(self, x, target=None, prediction=None):
         """
         """
-        new_x = x + (ch.rand_like(x) - 0.5).renorm(p=2, dim=0, maxnorm=self.eps)
+        if self.instance_attack_function is None: 
+            new_x = x + (ch.rand_like(x) - 0.5).renorm(p=2, dim=0, maxnorm=self.eps)
+        else:
+            eps_use, _ = self.instance_attack_function(x, target, prediction)
+            rand_x = (ch.rand_like(x) - 0.5)
+            rand_x = ch.cat([rand_x[idx:idx+1].renorm(p=2, dim=0, maxnorm=self.eps * eps_use[idx]) \
+                          for idx in range(len(rand_x))])
+            new_x = x + rand_x
         return ch.clamp(new_x, 0, 1)
 
 # Unconstrained threat model

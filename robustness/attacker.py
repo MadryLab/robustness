@@ -71,7 +71,8 @@ class Attacker(ch.nn.Module):
     def forward(self, x, target, *_, constraint, eps, step_size, iterations,
                 random_start=False, random_restarts=False, do_tqdm=False,
                 targeted=False, custom_loss=None, should_normalize=True,
-                orig_input=None, use_best=True, return_image=True, est_grad=None):
+                orig_input=None, use_best=True, return_image=True, est_grad=None,
+                instance_attack_function=None):
         """
         Implementation of forward (finds adversarial examples). Note that
         this does **not** perform inference and should not be called
@@ -140,8 +141,12 @@ class Attacker(ch.nn.Module):
 
         # Initialize step class and attacker criterion
         criterion = ch.nn.CrossEntropyLoss(reduction='none').cuda()
+
+        #print(instance_attack_function)
+        #exit("2")
         step_class = STEPS[constraint] if isinstance(constraint, str) else constraint
-        step = step_class(eps=eps, orig_input=orig_input, step_size=step_size) 
+        step = step_class(eps=eps, orig_input=orig_input, 
+                         step_size=step_size, instance_attack_function=instance_attack_function) 
 
         def calc_loss(inp, target):
             '''
@@ -160,7 +165,7 @@ class Attacker(ch.nn.Module):
         def get_adv_examples(x):
             # Random start (to escape certain types of gradient masking)
             if random_start:
-                x = step.random_perturb(x)
+                x = step.random_perturb(x, target=target, prediction=None)
 
             iterator = range(iterations)
             if do_tqdm: iterator = tqdm(iterator)
@@ -204,8 +209,8 @@ class Attacker(ch.nn.Module):
                     args = [losses, best_loss, x, best_x]
                     best_loss, best_x = replace_best(*args) if use_best else (losses, x)
 
-                    x = step.step(x, grad)
-                    x = step.project(x)
+                    x = step.step(x, grad, target=target, prediction=out)
+                    x = step.project(x, target=target, prediction=out)
                     if do_tqdm: iterator.set_description("Current loss: {l}".format(l=loss))
 
             # Save computation (don't compute last loss) if not use_best

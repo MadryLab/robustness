@@ -385,6 +385,11 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
 
     attack_kwargs = {}
     if adv:
+        # Instance adaptive training
+        has_instance_attack_function = has_attr(args, 'instance_attack_function')
+        instance_attack_function = args.instance_attack_function \
+            if (has_instance_attack_function and is_train) else None
+
         attack_kwargs = {
             'constraint': args.constraint,
             'eps': eps,
@@ -393,7 +398,8 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             'random_start': args.random_start,
             'custom_loss': adv_criterion,
             'random_restarts': random_restarts,
-            'use_best': bool(args.use_best)
+            'use_best': bool(args.use_best),
+            'instance_attack_function': instance_attack_function
         }
 
     iterator = tqdm(enumerate(loader), total=len(loader))
