@@ -35,24 +35,6 @@ def calc_est_grad(func, x, y, rad, num_samples):
         grad = (l.view(2*Q, B, *extender) * noise.view(2*Q, B, *noise.shape[1:])).mean(dim=0)
     return grad
 
-
-def calc_fadein_eps(epoch, fadein_length, eps):
-    """
-    Calculate an epsilon by fading in from zero.
-
-    Args:
-        epoch (int) : current epoch of training.
-        fadein_length (int) : number of epochs to fade in for.
-        eps (float) : the final epsilon
-
-    Returns:
-        The correct epsilon for the current epoch, based on eps=0 and epoch
-        zero and eps=eps at epoch :samp:`fadein_length` 
-    """
-    if fadein_length and fadein_length > 0:
-        eps = eps * min(float(epoch) / fadein_length, 1)
-    return eps
-
 def ckpt_at_epoch(num):
     return '%s_%s' % (num, constants.CKPT_NAME)
 

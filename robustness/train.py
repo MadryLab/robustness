@@ -6,8 +6,8 @@ from torchvision.utils import make_grid
 from cox.utils import Parameters
 
 from .tools import helpers
-from .tools.helpers import AverageMeter, calc_fadein_eps, \
-        save_checkpoint, ckpt_at_epoch, has_attr
+from .tools.helpers import AverageMeter, save_checkpoint, \
+                                ckpt_at_epoch, has_attr
 from .tools import constants as consts
 import dill 
 import time
@@ -34,8 +34,8 @@ def check_required_args(args, eval_only=False):
     required_args_eval = ["adv_eval"]
     required_args_train = ["epochs", "out_dir", "adv_train",
         "log_iters", "lr", "momentum", "weight_decay"]
-    adv_required_args = ["attack_steps", "eps", "constraint", "use_best",
-                        "eps_fadein_epochs", "attack_lr", "random_restarts"]
+    adv_required_args = ["attack_steps", "eps", "constraint", 
+            "use_best", "attack_lr", "random_restarts"]
 
     # Generic function for checking all arguments in a list
     def check_args(args_list):
@@ -175,8 +175,7 @@ def eval_model(args, model, loader, store):
     return log_info
 
 def train_model(args, model, loaders, *, checkpoint=None, 
-                store=None, update_params=None, optimizer=None,
-                scheduler=None):
+            store=None, update_params=None, disable_no_grad=False):
     """
     Main function for training a model. 
 
@@ -202,8 +201,12 @@ def train_model(args, model, loaders, *, checkpoint=None,
                 momentum parameter for SGD optimizer
             step_lr (int)
                 if given, drop learning rate by 10x every `step_lr` steps
-            custom_schedule (str)
-                If given, use a custom LR schedule (format: [(epoch, LR),...])
+            custom_lr_multplier (str)
+                If given, use a custom LR schedule, formed by multiplying the
+                    original ``lr`` (format: [(epoch, LR_MULTIPLIER),...])
+            lr_interpolation (str)
+                How to drop the learning rate, either ``step`` or ``linear``,
+                    ignored unless ``custom_lr_multiplier`` is provided.
             adv_eval (int or bool)
                 If True/1, then also do adversarial evaluation, otherwise skip
                 (ignored if adv_train is True)
@@ -221,8 +224,11 @@ def train_model(args, model, loaders, *, checkpoint=None,
                 float (or float-parseable string) for the adv attack budget
             attack_steps (int, *required if adv_train or adv_eval*)
                 number of steps to take in adv attack
-            eps_fadein_epochs (int, *required if adv_train or adv_eval*)
-                If greater than 0, fade in epsilon along this many epochs
+            custom_eps_multiplier (str, *required if adv_train or adv_eval*)
+                If given, then set epsilon according to a schedule by
+                multiplying the given eps value by a factor at each epoch. Given
+                in the same format as ``custom_lr_multiplier``, ``[(epoch,
+                MULTIPLIER)..]``
             use_best (int or bool, *required if adv_train or adv_eval*) :
                 If True/1, use the best (in terms of loss) PGD step as the
                 attack, if False/0 use the last step
@@ -257,9 +263,11 @@ def train_model(args, model, loaders, *, checkpoint=None,
         checkpoint (dict) : a loaded checkpoint previously saved by this library
             (if resuming from checkpoint)
         store (cox.Store) : a cox store for logging training progress
-        train_params (list) : list of parameters to use for training, if None
+        update_params (list) : list of parameters to use for training, if None
             then all parameters in the model are used (useful for transfer
             learning)
+        disable_no_grad (bool) : if True, then even model evaluation will be
+            run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
     """
     # Logging setup
     writer = store.tensorboard if store else None
@@ -269,8 +277,11 @@ def train_model(args, model, loaders, *, checkpoint=None,
     
     # Reformat and read arguments
     check_required_args(args) # Argument sanity check
-    args.eps = eval(str(args.eps)) if has_attr(args, 'eps') else None
-    args.attack_lr = eval(str(args.attack_lr)) if has_attr(args, 'attack_lr') else None
+    for p in ['eps', 'attack_lr', 'custom_eps_multiplier']:
+        setattr(args, p, eval(str(getattr(args, p))) if has_attr(args, p) else None)
+    if args.custom_eps_multiplier is not None: 
+        eps_periods = args.custom_eps_multiplier
+        args.custom_eps_multiplier = lambda t: np.interp([t], *zip(*eps_periods))[0]
 
     # Initial setup
     train_loader, val_loader = loaders
@@ -316,7 +327,8 @@ def train_model(args, model, loaders, *, checkpoint=None,
 
         if should_log or last_epoch or should_save_ckpt:
             # log + get best
-            with ch.no_grad():
+            ctx = ch.enable_grad() if disable_no_grad else ch.no_grad() 
+            with ctx:
                 prec1, nat_loss = _model_loop(args, 'val', val_loader, model, 
                         None, epoch, False, writer)
 
@@ -398,9 +410,10 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
 
     # If adv training (or evaling), set eps and random_restarts appropriately
     if adv:
-        eps = calc_fadein_eps(epoch, args.eps_fadein_epochs, args.eps) \
-                if is_train else args.eps
+        eps = args.custom_eps_multiplier(epoch) * args.eps \
+                if (is_train and args.custom_eps_multiplier) else args.eps
         random_restarts = 0 if is_train else args.random_restarts
+        print(args.eps)
 
     # Custom training criterion
     has_custom_train_loss = has_attr(args, 'custom_train_loss')

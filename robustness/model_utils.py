@@ -88,27 +88,26 @@ def make_and_restore_model(*_, arch, dataset, resume_path=None,
 
     # optionally resume from a checkpoint
     checkpoint = None
-    if resume_path:
-        if os.path.isfile(resume_path):
-            print("=> loading checkpoint '{}'".format(resume_path))
-            checkpoint = ch.load(resume_path, pickle_module=dill)
-            
-            # Makes us able to load models saved with legacy versions
-            state_dict_path = 'model'
-            if not ('model' in checkpoint):
-                state_dict_path = 'state_dict'
+    if resume_path and os.path.isfile(resume_path):
+        print("=> loading checkpoint '{}'".format(resume_path))
+        checkpoint = ch.load(resume_path, pickle_module=dill)
+        
+        # Makes us able to load models saved with legacy versions
+        state_dict_path = 'model'
+        if not ('model' in checkpoint):
+            state_dict_path = 'state_dict'
 
-            sd = checkpoint[state_dict_path]
-            sd = {k[len('module.'):]:v for k,v in sd.items()}
-            model.load_state_dict(sd)
-            if parallel:
-                model = ch.nn.DataParallel(model)
-            model = model.cuda()
+        sd = checkpoint[state_dict_path]
+        sd = {k[len('module.'):]:v for k,v in sd.items()}
+        model.load_state_dict(sd)
+        print("=> loaded checkpoint '{}' (epoch {})".format(resume_path, checkpoint['epoch']))
+    elif resume_path:
+        error_msg = "=> no checkpoint found at '{}'".format(resume_path)
+        raise ValueError(error_msg)
 
-            print("=> loaded checkpoint '{}' (epoch {})".format(resume_path, checkpoint['epoch']))
-        else:
-            error_msg = "=> no checkpoint found at '{}'".format(resume_path)
-            raise ValueError(error_msg)
+    if parallel:
+        model = ch.nn.DataParallel(model)
+    model = model.cuda()
 
     return model, checkpoint
 

@@ -66,7 +66,7 @@ TRAINING_ARGS = [
     ['weight-decay', float, 'SGD weight decay parameter', BY_DATASET],
     ['momentum', float, 'SGD momentum parameter', 0.9],
     ['step-lr', int, 'number of steps between 10x LR drops', BY_DATASET],
-    ['custom-lr-multiplier', str, 'LR sched (format: [(epoch, LR),...])', None],
+    ['custom-lr-multiplier', str, 'LR multiplier sched (format: [(epoch, LR),...])', None],
     ['lr-interpolation', ["linear", "step"], 'Drop LR as step function or linearly', "step"],
     ['adv-train', [0, 1], 'whether to train adversarially', REQ],
     ['adv-eval', [0, 1], 'whether to adversarially evaluate', None], 
@@ -89,7 +89,7 @@ PGD_ARGS = [
     ['use-best', [0, 1], 'if 1 (0) use best (final) PGD step as example', 1],
     ['random-restarts', int, 'number of random PGD restarts for eval', 0],
     ['random-start', [0, 1], 'start with random noise instead of pgd step', 0],
-    ['eps-fadein-epochs', int, 'fade in eps over this many iterations', 0],
+    ['custom-eps-multiplier', str, 'eps mult. sched (same format as LR)', None]
 ]
 """
 Arguments essential for the :meth:`robustness.train.train_model` function if
