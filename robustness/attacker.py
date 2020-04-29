@@ -265,8 +265,8 @@ class AttackerModel(ch.nn.Module):
         out = model(x) # normal inference (no label needed)
 
     More code examples available in the documentation for `forward`.
-    For a more comprehensive overview of this class, see `our detailed
-    walkthrough <../example_usage/input_space_manipulation>`_
+    For a more comprehensive overview of this class, see 
+    :doc:`our detailed walkthrough <../example_usage/input_space_manipulation>`.
     """
     def __init__(self, model, dataset):
         super(AttackerModel, self).__init__()
@@ -316,18 +316,15 @@ class AttackerModel(ch.nn.Module):
 
             inp = adv
 
+        normalized_inp = self.normalizer(inp)
+
+        if no_relu and (not with_latent):
+            print("WARNING: 'no_relu' has no visible effect if 'with_latent is False.")
+        if no_relu and fake_relu:
+            raise ValueError("Options 'no_relu' and 'fake_relu' are exclusive")
+
+        output = self.model(normalized_inp, with_latent=with_latent,
+                                fake_relu=fake_relu, no_relu=no_relu)
         if with_image:
-            normalized_inp = self.normalizer(inp)
-
-            if no_relu and (not with_latent):
-                print("WARNING: 'no_relu' has no visible effect if 'with_latent is False.")
-            if no_relu and fake_relu:
-                raise ValueError("Options 'no_relu' and 'fake_relu' are exclusive")
-
-            output = self.model(normalized_inp, with_latent=with_latent,
-                                    fake_relu=fake_relu, no_relu=no_relu)
-        else:
-            output = None
-
-        return (output, inp)
-
+            return (output, inp)
+        return output
