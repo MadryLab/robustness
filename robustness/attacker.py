@@ -265,8 +265,8 @@ class AttackerModel(ch.nn.Module):
         out = model(x) # normal inference (no label needed)
 
     More code examples available in the documentation for `forward`.
-    For a more comprehensive overview of this class, see `our detailed
-    walkthrough <../example_usage/input_space_manipulation.rst>`_
+    For a more comprehensive overview of this class, see 
+    :doc:`our detailed walkthrough <../example_usage/input_space_manipulation>`.
     """
     def __init__(self, model, dataset):
         super(AttackerModel, self).__init__()
