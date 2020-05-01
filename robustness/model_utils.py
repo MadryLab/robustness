@@ -51,7 +51,7 @@ class DummyModel(nn.Module):
         return self.model(x)
 
 def make_and_restore_model(*_, arch, dataset, resume_path=None,
-         parallel=True, pytorch_pretrained=False, add_custom_forward=False):
+         parallel=None, pytorch_pretrained=False, add_custom_forward=False):
     """
     Makes a model and (optionally) restores it from a checkpoint.
 
@@ -63,7 +63,7 @@ def make_and_restore_model(*_, arch, dataset, resume_path=None,
             robustness library (ignored if ``arch`` is not a string)
         not a string
         parallel (bool): if True, wrap the model in a DataParallel 
-            (default True, recommended)
+            (defaults to the same as ``resume_path is not None``)
         pytorch_pretrained (bool): if True, try to load a standard-trained 
             checkpoint from the torchvision library (throw error if failed)
         add_custom_forward (bool): ignored unless arch is an instance of
@@ -80,6 +80,7 @@ def make_and_restore_model(*_, arch, dataset, resume_path=None,
     """
     if (not isinstance(arch, str)) and add_custom_forward:
         arch = DummyModel(arch)
+    if parallel is None: parallel = (resume_path is not None)
 
     classifier_model = dataset.get_model(arch, pytorch_pretrained) if \
                             isinstance(arch, str) else arch
