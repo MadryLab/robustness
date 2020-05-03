@@ -82,6 +82,7 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
             subset = np.arange(train_sample_count - subset, train_sample_count)
 
         train_set = Subset(train_set, subset)
+
     if not only_val:
         train_loader = DataLoader(train_set, batch_size=batch_size, 
             shuffle=shuffle_train, num_workers=workers, pin_memory=True)
