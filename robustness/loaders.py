@@ -68,7 +68,7 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
         attrs = ["samples", "train_data", "data"]
         vals = {attr: hasattr(train_set, attr) for attr in attrs}
         assert any(vals.values()), f"dataset must expose one of {attrs}"
-        train_sample_count = len([k for k in vals if vals[k]][0])
+        train_sample_count = len(getattr(train_set,[k for k in vals if vals[k]][0]))
 
     if (not only_val) and (subset is not None) and (subset <= train_sample_count):
         assert not only_val
@@ -82,7 +82,6 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
             subset = np.arange(train_sample_count - subset, train_sample_count)
 
         train_set = Subset(train_set, subset)
-
     if not only_val:
         train_loader = DataLoader(train_set, batch_size=batch_size, 
             shuffle=shuffle_train, num_workers=workers, pin_memory=True)
