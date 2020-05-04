@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from torchvision.models.utils import load_state_dict_from_url
-from .custom_modules import FakeReLUM
+from robustness.tools.custom_modules import FakeReLUM
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',

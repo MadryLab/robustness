@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
-from .custom_modules import SequentialWithArgs, FakeReLU
+from robustness.tools.custom_modules import SequentialWithArgs, FakeReLU
 
 __all__ = ['leaky_resnet18', 'leaky_resnet34', 'leaky_resnet50',
     'leaky_resnet101', 'leaky_resnet152']
