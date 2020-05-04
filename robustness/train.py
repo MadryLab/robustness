@@ -242,6 +242,10 @@ def train_model(args, model, loaders, *, checkpoint=None,
                 loss function takes in `model, input, target` and should return
                 a vector representing the loss for each element of the batch, as
                 well as the classifier output.
+            custom_accuracy (function)
+                If given, should be a function that takes in model outputs
+                and model targets and outputs a top1 and top5 accuracy, will 
+                displayed instead of conventional accuracies
             regularizer (function, optional) 
                 If given, this function of `model, input, target` returns a
                 (scalar) that is added on to the training loss without being
@@ -453,11 +457,15 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
         top5_acc = float('nan')
         try:
             maxk = min(5, model_logits.shape[-1])
-            prec1, prec5 = helpers.accuracy(model_logits, target, topk=(1, maxk))
+            if has_attr(args, "custom_accuracy"):
+                prec1, prec5 = args.custom_accuracy(model_logits, target)
+            else:
+                prec1, prec5 = helpers.accuracy(model_logits, target, topk=(1, maxk))
+                prec1, prec5 = prec1[0], prec5[0]
 
             losses.update(loss.item(), inp.size(0))
-            top1.update(prec1[0], inp.size(0))
-            top5.update(prec5[0], inp.size(0))
+            top1.update(prec1, inp.size(0))
+            top5.update(prec5, inp.size(0))
 
             top1_acc = top1.avg
             top5_acc = top5.avg
