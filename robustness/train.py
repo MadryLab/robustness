@@ -287,15 +287,16 @@ def train_model(args, model, loaders, *, checkpoint=None,
     train_loader, val_loader = loaders
     opt, schedule = make_optimizer_and_schedule(args, model, checkpoint, update_params)
 
+    # Put the model into parallel mode
+    assert not hasattr(model, "module"), "model is already in DataParallel."
+    model = ch.nn.DataParallel(model).cuda()
+
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
         s = f"{'adv' if args.adv_train else 'nat'}_prec1"
-        best_prec1 = checkpoint[s] if s in checkpoint else 0.0
-
-    # Put the model into parallel mode
-    assert not hasattr(model, "module"), "model is already in DataParallel."
-    model = ch.nn.DataParallel(model).cuda()
+        best_prec1 = checkpoint[s] if s in checkpoint \
+            else _model_loop(args, 'val', val_loader, model, None, start_epoch-1, args.adv_train, writer=None)[0]
 
     # Timestamp for training start time
     start_time = time.time()
@@ -413,7 +414,6 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
         eps = args.custom_eps_multiplier(epoch) * args.eps \
                 if (is_train and args.custom_eps_multiplier) else args.eps
         random_restarts = 0 if is_train else args.random_restarts
-        print(args.eps)
 
     # Custom training criterion
     has_custom_train_loss = has_attr(args, 'custom_train_loss')
