@@ -104,7 +104,7 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
                 return 1.0
         schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
     elif args.step_lr:
-        schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr)
+        schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr, gamma=args.step_lr_gamma)
 
     # Fast-forward the optimizer and the scheduler if resuming
     if checkpoint:
