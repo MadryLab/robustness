@@ -10,9 +10,10 @@ from .tools.helpers import AverageMeter, save_checkpoint, \
                                 ckpt_at_epoch, has_attr
 from .tools import constants as consts
 import dill 
-import time
-
 import os
+import time
+import warnings
+
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
     from tqdm import tqdm_notebook as tqdm
 else:
@@ -470,7 +471,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             top1_acc = top1.avg
             top5_acc = top5.avg
         except:
-            pass
+            warnings.warn('Failed to calculate the accuracy.')
 
         reg_term = 0.0
         if has_attr(args, "regularizer"):
