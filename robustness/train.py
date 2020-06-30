@@ -22,7 +22,7 @@ else:
 try:
     from apex import amp
 except Exception as e:
-    pass
+    warnings.warn('Could not import amp.')
 
 def check_required_args(args, eval_only=False):
     """
