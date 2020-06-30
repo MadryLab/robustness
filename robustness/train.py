@@ -120,7 +120,8 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
                 schedule.step()
         
         if 'amp' in checkpoint:
-            amp.load_state_dict(checkpoint['amp'])
+            if checkpoint['amp'] != "N/A":
+                amp.load_state_dict(checkpoint['amp'])
 
         # TODO: see if there's a smarter way to do this
         # TODO: see what's up with loading fp32 weights and then MP training
@@ -299,7 +300,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
-        s = f"{'adv' if args.adv_train else 'nat'}_prec1"
+        s = 'best_prec1'
         best_prec1 = checkpoint[s] if s in checkpoint \
             else _model_loop(args, 'val', val_loader, model, None, start_epoch-1, args.adv_train, writer=None)[0]
 
@@ -318,7 +319,8 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'optimizer':opt.state_dict(),
             'schedule':(schedule and schedule.state_dict()),
             'epoch': epoch+1,
-            'amp': amp.state_dict() if args.mixed_precision else "N/A"
+            'amp': amp.state_dict() if args.mixed_precision else "N/A",
+            'best_prec1': None,
         }
 
 
@@ -348,6 +350,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
             our_prec1 = adv_prec1 if args.adv_train else prec1
             is_best = our_prec1 > best_prec1
             best_prec1 = max(our_prec1, best_prec1)
+            sd_info['best_prec1'] = best_prec1
 
             # log every checkpoint
             log_info = {

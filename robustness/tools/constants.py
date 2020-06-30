@@ -27,7 +27,8 @@ CKPTS_SCHEMA = {
     'model': store.PYTORCH_STATE,
     'optimizer': store.PYTORCH_STATE,
     'schedule': store.PYTORCH_STATE,
-    'amp': store.PYTORCH_STATE
+    'amp': store.PYTORCH_STATE,
+    'best_prec1': store.PYTORCH_STATE
 }
 
 LOGS_SCHEMA = {
