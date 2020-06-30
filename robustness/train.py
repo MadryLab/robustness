@@ -119,9 +119,8 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
             for i in range(steps_to_take):
                 schedule.step()
         
-        if 'amp' in checkpoint:
-            if checkpoint['amp'] != "N/A":
-                amp.load_state_dict(checkpoint['amp'])
+        if 'amp' in checkpoint and checkpoint['amp'] is not None:
+            amp.load_state_dict(checkpoint['amp'])
 
         # TODO: see if there's a smarter way to do this
         # TODO: see what's up with loading fp32 weights and then MP training
@@ -319,7 +318,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'optimizer':opt.state_dict(),
             'schedule':(schedule and schedule.state_dict()),
             'epoch': epoch+1,
-            'amp': amp.state_dict() if args.mixed_precision else "N/A",
+            'amp': amp.state_dict() if args.mixed_precision else None,
             'best_prec1': None,
         }
 
