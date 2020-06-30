@@ -52,7 +52,13 @@ TRAINING_DEFAULTS = {
         "batch_size": 64,
         "weight_decay": 5e-4,
         "step_lr": 50
-    }
+    },
+    datasets.OpenImages: {
+        "epochs": 200,
+        "batch_size":256,
+        "weight_decay":1e-4,
+        "step_lr": 50
+    },
 }
 """
 Default hyperparameters for training by dataset (tested for resnet50).
