@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from robustness.tools.custom_modules import SequentialWithArgs, FakeReLU
 
-
 class BasicBlock(nn.Module):
     expansion = 1
 

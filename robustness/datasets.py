@@ -15,7 +15,7 @@ Currently supported datasets:
 datasets to the library.
 """
 
-import os
+import pathlib
 
 import torch as ch
 import torch.utils.data
@@ -77,6 +77,19 @@ class DataSet(object):
         self.ds_name = ds_name
         self.data_path = data_path
         self.__dict__.update(kwargs)
+    
+    def override_args(self, default_args, new_args):
+        '''
+        Convenience method for overriding arguments. (Internal)
+        '''
+        kwargs = {k: v for (k, v) in new_args.items() if v is not None}
+        extra_args = set(kwargs.keys()) - set(default_args.keys()) 
+        if len(extra_args) > 0: raise ValueError(f"Invalid arguments: {extra_args}")
+        for k in kwargs:
+            req_type = type(default_args[k])
+            if not isinstance(kwargs[k], req_type):
+                raise ValueError(f"Argument {k} should have type {req_type}")
+        return {**default_args, **kwargs}
 
     def get_model(self, arch, pretrained):
         '''
@@ -175,6 +188,7 @@ class ImageNet(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(ImageNet, self).__init__('imagenet', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
@@ -205,6 +219,7 @@ class Places365(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(256),
             'transform_test': da.TEST_TRANSFORMS_DEFAULT(256)
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(Places365, self).__init__('places365', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
@@ -250,6 +265,7 @@ class RestrictedImageNet(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(RestrictedImageNet, self).__init__(ds_name,
                 data_path, **ds_kwargs)
 
@@ -285,6 +301,7 @@ class CustomImageNet(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(CustomImageNet, self).__init__(ds_name,
                 data_path, **ds_kwargs)
 
@@ -328,6 +345,7 @@ class CIFAR(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(32),
             'transform_test': da.TEST_TRANSFORMS_DEFAULT(32)
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(CIFAR, self).__init__('cifar', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
@@ -361,6 +379,7 @@ class CINIC(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(32),
             'transform_test': da.TEST_TRANSFORMS_DEFAULT(32)
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(CINIC, self).__init__('cinic', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
@@ -389,7 +408,7 @@ class A2B(DataSet):
     def __init__(self, data_path, **kwargs):
         """
         """
-        _, ds_name = os.path.split(data_path)
+        ds_name = pathlib.Path(data_path).parts[-1]
         valid_names = ['horse2zebra', 'apple2orange', 'summer2winter_yosemite']
         assert ds_name in valid_names, \
                 f"path must end in one of {valid_names}, not {ds_name}"
@@ -402,6 +421,7 @@ class A2B(DataSet):
             'label_mapping': None,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(A2B, self).__init__(ds_name, data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained=False):
