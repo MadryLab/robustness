@@ -276,7 +276,9 @@ def train_model(args, model, loaders, *, checkpoint=None,
     """
     # Logging setup
     writer = store.tensorboard if store else None
+    best_prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
     if store is not None: 
+        consts.CKPTS_SCHEMA[best_prec1_key] = store.PYTORCH_STATE
         store.add_table(consts.LOGS_TABLE, consts.LOGS_SCHEMA)
         store.add_table(consts.CKPTS_TABLE, consts.CKPTS_SCHEMA)
     
@@ -299,8 +301,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
-        s = 'best_prec1'
-        best_prec1 = checkpoint[s] if s in checkpoint \
+        best_prec1 = checkpoint[best_prec1_key] if best_prec1_key in checkpoint \
             else _model_loop(args, 'val', val_loader, model, None, start_epoch-1, args.adv_train, writer=None)[0]
 
     # Timestamp for training start time
@@ -319,7 +320,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'schedule':(schedule and schedule.state_dict()),
             'epoch': epoch+1,
             'amp': amp.state_dict() if args.mixed_precision else None,
-            'best_prec1': None,
+            best_prec1_key: best_prec1,
         }
 
 
@@ -349,7 +350,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
             our_prec1 = adv_prec1 if args.adv_train else prec1
             is_best = our_prec1 > best_prec1
             best_prec1 = max(our_prec1, best_prec1)
-            sd_info['best_prec1'] = best_prec1
+            sd_info[best_prec1_key] = best_prec1
 
             # log every checkpoint
             log_info = {
