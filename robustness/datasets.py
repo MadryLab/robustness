@@ -434,6 +434,18 @@ class A2B(DataSet):
 
 class OpenImages(DataSet):
     """
+    OpenImages dataset [KDA+17]_
+
+    More info: https://storage.googleapis.com/openimages/web/index.html
+
+    600-way classification with graular labels and bounding boxes.
+
+    ..[KDA+17] Krasin I., Duerig T., Alldrin N., Ferrari V., Abu-El-Haija S.,
+    Kuznetsova A., Rom H., Uijlings J., Popov S., Kamali S., Malloci M.,
+    Pont-Tuset J., Veit A., Belongie S., Gomes V., Gupta A., Sun C., Chechik G.,
+    Cai D., Feng Z., Narayanan D., Murphy K. (2017). OpenImages: A public
+    dataset for large-scale multi-label and multi-class image classification.
+    Available from https://storage.googleapis.com/openimages/web/index.html. 
     """
     def __init__(self, data_path, **kwargs):
         """
@@ -447,6 +459,7 @@ class OpenImages(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(OpenImages, self).__init__('openimages', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
