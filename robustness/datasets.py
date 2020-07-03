@@ -23,6 +23,7 @@ from . import imagenet_models, cifar_models
 from torchvision import transforms, datasets
 
 from .tools import constants
+from .tools import openimgs_helpers
 from . import data_augmentation as da
 from . import loaders
 
@@ -431,6 +432,30 @@ class A2B(DataSet):
             raise ValueError('A2B does not support pytorch_pretrained=True')
         return imagenet_models.__dict__[arch](num_classes=self.num_classes)
 
+class OpenImages(DataSet):
+    """
+    """
+    def __init__(self, data_path, **kwargs):
+        """
+        """
+        ds_kwargs = {
+            'num_classes': 601,
+            'mean': ch.tensor([0.4859, 0.4131, 0.3083]),
+            'std': ch.tensor([0.2919, 0.2507, 0.2273]),
+            'custom_class': openimgs_helpers.OIDatasetFolder,
+            'label_mapping': None, 
+            'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
+            'transform_test': da.TEST_TRANSFORMS_IMAGENET
+        }
+        super(OpenImages, self).__init__('openimages', data_path, **ds_kwargs)
+
+    def get_model(self, arch, pretrained):
+        """
+        """
+        if pretrained:
+            raise ValueError('OpenImages does not support pytorch_pretrained=True')
+        return imagenet_models.__dict__[arch](num_classes=self.num_classes)
+
 DATASETS = {
     'imagenet': ImageNet,
     'restricted_imagenet': RestrictedImageNet,
@@ -438,7 +463,8 @@ DATASETS = {
     'cifar': CIFAR,
     'cinic': CINIC,
     'a2b': A2B,
-    'places365': Places365
+    'places365': Places365,
+    'openimages': OpenImages
 }
 '''
 Dictionary of datasets. A dataset class can be accessed as:

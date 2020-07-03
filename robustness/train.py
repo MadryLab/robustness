@@ -10,9 +10,10 @@ from .tools.helpers import AverageMeter, save_checkpoint, \
                                 ckpt_at_epoch, has_attr
 from .tools import constants as consts
 import dill 
-import time
-
 import os
+import time
+import warnings
+
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
     from tqdm import tqdm_notebook as tqdm
 else:
@@ -21,7 +22,7 @@ else:
 try:
     from apex import amp
 except Exception as e:
-    pass
+    warnings.warn('Could not import amp.')
 
 def check_required_args(args, eval_only=False):
     """
@@ -118,7 +119,7 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
             for i in range(steps_to_take):
                 schedule.step()
         
-        if 'amp' in checkpoint:
+        if 'amp' in checkpoint and checkpoint['amp'] is not None:
             amp.load_state_dict(checkpoint['amp'])
 
         # TODO: see if there's a smarter way to do this
@@ -298,7 +299,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
-        s = f"{'adv' if args.adv_train else 'nat'}_prec1"
+        s = 'best_prec1'
         best_prec1 = checkpoint[s] if s in checkpoint \
             else _model_loop(args, 'val', val_loader, model, None, start_epoch-1, args.adv_train, writer=None)[0]
 
@@ -317,7 +318,8 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'optimizer':opt.state_dict(),
             'schedule':(schedule and schedule.state_dict()),
             'epoch': epoch+1,
-            'amp': amp.state_dict() if args.mixed_precision else "N/A"
+            'amp': amp.state_dict() if args.mixed_precision else None,
+            'best_prec1': None,
         }
 
 
@@ -347,6 +349,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
             our_prec1 = adv_prec1 if args.adv_train else prec1
             is_best = our_prec1 > best_prec1
             best_prec1 = max(our_prec1, best_prec1)
+            sd_info['best_prec1'] = best_prec1
 
             # log every checkpoint
             log_info = {
@@ -470,7 +473,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             top1_acc = top1.avg
             top5_acc = top5.avg
         except:
-            pass
+            warnings.warn('Failed to calculate the accuracy.')
 
         reg_term = 0.0
         if has_attr(args, "regularizer"):
