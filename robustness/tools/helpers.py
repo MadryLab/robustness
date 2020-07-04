@@ -137,11 +137,6 @@ class DataPrefetcher():
             if type(self.stop_after) is int and (count > self.stop_after):
                 break
 
-def save_checkpoint(state, is_best, filename):
-    ch.save(state, filename, pickle_module=dill)
-    if is_best:
-        shutil.copyfile(filename, filename + constants.BEST_APPEND)
-
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
