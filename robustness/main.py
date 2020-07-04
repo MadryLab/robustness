@@ -54,7 +54,9 @@ def main(args, store=None):
     if args.eval_only:
         return eval_model(args, model, val_loader, store=store)
 
-    model = train_model(args, model, loaders, store=store)
+    if not args.resume_optimizer: checkpoint = None
+    model = train_model(args, model, loaders, store=store,
+                                    checkpoint=checkpoint)
     return model
 
 def setup_args(args):

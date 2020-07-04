@@ -42,7 +42,8 @@ STEPS = {
     'inf': attack_steps.LinfStep,
     '2': attack_steps.L2Step,
     'unconstrained': attack_steps.UnconstrainedStep,
-    'fourier': attack_steps.FourierStep
+    'fourier': attack_steps.FourierStep,
+    'random_smooth': attack_steps.RandomStep
 }
 
 class Attacker(ch.nn.Module):
@@ -71,7 +72,8 @@ class Attacker(ch.nn.Module):
     def forward(self, x, target, *_, constraint, eps, step_size, iterations,
                 random_start=False, random_restarts=False, do_tqdm=False,
                 targeted=False, custom_loss=None, should_normalize=True,
-                orig_input=None, use_best=True, return_image=True, est_grad=None):
+                orig_input=None, use_best=True, return_image=True,
+                est_grad=None, mixed_precision=False):
         """
         Implementation of forward (finds adversarial examples). Note that
         this does **not** perform inference and should not be called
@@ -118,6 +120,8 @@ class Attacker(ch.nn.Module):
                 :math:`\\nabla_x f(x) \\approx \\sum_{i=0}^N f(x + R\\cdot
                 \\vec{\\delta_i})\\cdot \\vec{\\delta_i}`, where
                 :math:`\delta_i` are randomly sampled from the unit ball.
+            mixed_precision (bool) : if True, use mixed-precision calculations
+                to compute the adversarial examples / do the inference.
         Returns:
             An adversarial example for x (i.e. within a feasible set
             determined by `eps` and `constraint`, but classified as:
@@ -129,7 +133,6 @@ class Attacker(ch.nn.Module):
             from the unit ball, and then use :math:`\delta_{N/2+i} =
             -\delta_{i}`.
         """
-
         # Can provide a different input to make the feasible set around
         # instead of the initial point
         if orig_input is None: orig_input = x.detach()
@@ -139,7 +142,7 @@ class Attacker(ch.nn.Module):
         m = -1 if targeted else 1
 
         # Initialize step class and attacker criterion
-        criterion = ch.nn.CrossEntropyLoss(reduction='none').cuda()
+        criterion = ch.nn.CrossEntropyLoss(reduction='none')
         step_class = STEPS[constraint] if isinstance(constraint, str) else constraint
         step = step_class(eps=eps, orig_input=orig_input, step_size=step_size) 
 
@@ -192,7 +195,12 @@ class Attacker(ch.nn.Module):
                 loss = ch.mean(losses)
 
                 if step.use_grad:
-                    if est_grad is None:
+                    if (est_grad is None) and mixed_precision:
+                        with amp.scale_loss(loss, []) as sl:
+                            sl.backward()
+                        grad = x.grad.detach()
+                        x.grad.zero_()
+                    elif (est_grad is None):
                         grad, = ch.autograd.grad(m * loss, [x])
                     else:
                         f = lambda _x, _y: m * calc_loss(step.to_image(_x), _y)[0]
@@ -257,8 +265,8 @@ class AttackerModel(ch.nn.Module):
         out = model(x) # normal inference (no label needed)
 
     More code examples available in the documentation for `forward`.
-    For a more comprehensive overview of this class, see `our detailed
-    walkthrough <../example_usage/input_space_manipulation>`_
+    For a more comprehensive overview of this class, see 
+    :doc:`our detailed walkthrough <../example_usage/input_space_manipulation>`.
     """
     def __init__(self, model, dataset):
         super(AttackerModel, self).__init__()
@@ -308,18 +316,15 @@ class AttackerModel(ch.nn.Module):
 
             inp = adv
 
+        normalized_inp = self.normalizer(inp)
+
+        if no_relu and (not with_latent):
+            print("WARNING: 'no_relu' has no visible effect if 'with_latent is False.")
+        if no_relu and fake_relu:
+            raise ValueError("Options 'no_relu' and 'fake_relu' are exclusive")
+
+        output = self.model(normalized_inp, with_latent=with_latent,
+                                fake_relu=fake_relu, no_relu=no_relu)
         if with_image:
-            normalized_inp = self.normalizer(inp)
-
-            if no_relu and (not with_latent):
-                print("WARNING: 'no_relu' has no visible effect if 'with_latent is False.")
-            if no_relu and fake_relu:
-                raise ValueError("Options 'no_relu' and 'fake_relu' are exclusive")
-
-            output = self.model(normalized_inp, with_latent=with_latent,
-                                    fake_relu=fake_relu, no_relu=no_relu)
-        else:
-            output = None
-
-        return (output, inp)
-
+            return (output, inp)
+        return output

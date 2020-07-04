@@ -230,17 +230,23 @@ follows:
    
    @misc{robustness,
       title={Robustness (Python Library)},
-      author={Logan Engstrom and Andrew Ilyas and Shibani Santurkar and Dimitris Tsipras},
+      author={Logan Engstrom and Andrew Ilyas and Hadi Salman and Shibani Santurkar and Dimitris Tsipras},
       year={2019},
       url={https://github.com/MadryLab/robustness}
    }
 
 *(Have you used the package and found it useful? Let us know!)*.
 
-Contributors
+Maintainers
 -------------
 - `Andrew Ilyas <https://twitter.com/andrew_ilyas>`_
 - `Logan Engstrom <https://twitter.com/logan_engstrom>`_
 - `Shibani Santurkar <https://twitter.com/ShibaniSan>`_
 - `Dimitris Tsipras <https://twitter.com/tsiprasd>`_
+- `Hadi Salman <https://twitter.com/hadisalmanX>`_
 
+Contributors/Commiters
+'''''''''''''''''''''''
+- Kristian Georgiev
+- `iamgroot42 <https://github.com/MadryLab/robustness/pulls/iamgroot42>`_
+- `TLMichael <https://github.com/TLMichael>`_

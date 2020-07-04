@@ -131,8 +131,10 @@ class L2Step(AttackerStep):
     def random_perturb(self, x):
         """
         """
-        new_x = x + (ch.rand_like(x) - 0.5).renorm(p=2, dim=0, maxnorm=self.eps)
-        return ch.clamp(new_x, 0, 1)
+        l = len(x.shape) - 1
+        rp = ch.randn_like(x)
+        rp_norm = rp.view(rp.shape[0], -1).norm(dim=1).view(-1, *([1]*l))
+        return ch.clamp(x + self.eps * rp / (rp_norm + 1e-10), 0, 1)
 
 # Unconstrained threat model
 class UnconstrainedStep(AttackerStep):
@@ -180,3 +182,26 @@ class FourierStep(AttackerStep):
         """
         """
         return ch.sigmoid(ch.irfft(x, 2, normalized=True, onesided=False))
+
+class RandomStep(AttackerStep):
+    """
+    Step for Randomized Smoothing.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.use_grad = False
+
+    def project(self, x):
+        """
+        """
+        return x
+
+    def step(self, x, g):
+        """
+        """
+        return x + self.step_size * ch.randn_like(x)
+
+    def random_perturb(self, x):
+        """
+        """
+        return x
