@@ -4,7 +4,7 @@ import numpy as np
 from collections import OrderedDict, Counter
 import operator
 import networkx as nx
-from robustness.datasets import DATASETS
+from ..datasets import DATASETS
 
 class ClassHierarchy():
     '''
