@@ -29,12 +29,6 @@ TRAINING_DEFAULTS = {
         "weight_decay":1e-4,
         "step_lr": 50
     },
-    datasets.Places365: {
-        "epochs": 200,
-        "batch_size":256,
-        "weight_decay":1e-4,
-        "step_lr": 50
-    },
     datasets.RestrictedImageNet: {
         "epochs": 150,
         "batch_size": 256,
@@ -52,13 +46,7 @@ TRAINING_DEFAULTS = {
         "batch_size": 64,
         "weight_decay": 5e-4,
         "step_lr": 50
-    },
-    datasets.OpenImages: {
-        "epochs": 200,
-        "batch_size":256,
-        "weight_decay":1e-4,
-        "step_lr": 50
-    },
+    }
 }
 """
 Default hyperparameters for training by dataset (tested for resnet50).
@@ -69,12 +57,10 @@ TRAINING_ARGS = [
     ['out-dir', str, 'where to save training logs and checkpoints', REQ],
     ['epochs', int, 'number of epochs to train for', BY_DATASET],
     ['lr', float, 'initial learning rate for training', 0.1],
-    ['weight-decay', float, 'SGD weight decay parameter', BY_DATASET],
+    ['weight_decay', float, 'SGD weight decay parameter', BY_DATASET],
     ['momentum', float, 'SGD momentum parameter', 0.9],
-    ['step-lr', int, 'number of steps between step-lr-gamma x LR drops', BY_DATASET],
-    ['step-lr-gamma', float, 'multiplier by which LR drops in step scheduler', 0.1],
-    ['custom-lr-multiplier', str, 'LR multiplier sched (format: [(epoch, LR),...])', None],
-    ['lr-interpolation', ["linear", "step"], 'Drop LR as step function or linearly', "step"],
+    ['step-lr', int, 'number of steps between 10x LR drops', BY_DATASET],
+    ['custom-schedule', str, 'LR sched (format: [(epoch, LR),...])', None],
     ['adv-train', [0, 1], 'whether to train adversarially', REQ],
     ['adv-eval', [0, 1], 'whether to adversarially evaluate', None], 
     ['log-iters', int, 'how frequently (in epochs) to log', 5],
@@ -96,7 +82,7 @@ PGD_ARGS = [
     ['use-best', [0, 1], 'if 1 (0) use best (final) PGD step as example', 1],
     ['random-restarts', int, 'number of random PGD restarts for eval', 0],
     ['random-start', [0, 1], 'start with random noise instead of pgd step', 0],
-    ['custom-eps-multiplier', str, 'eps mult. sched (same format as LR)', None]
+    ['eps-fadein-epochs', int, 'fade in eps over this many iterations', 0],
 ]
 """
 Arguments essential for the :meth:`robustness.train.train_model` function if
@@ -113,9 +99,7 @@ MODEL_LOADER_ARGS = [
     ['batch-size', int, 'batch size for data loading', BY_DATASET],
     ['workers', int, '# data loading workers', 30],
     ['resume', str, 'path to checkpoint to resume from', None],
-    ['resume-optimizer', [0, 1], 'whether to also resume optimizers', 0],
     ['data-aug', [0, 1], 'whether to use data augmentation', 1],
-    ['mixed-precision', [0, 1], 'whether to use MP training (faster)', 0],
 ]
 """
 Arguments essential for constructing the model and dataloaders that will be fed

@@ -99,22 +99,6 @@ Adding these few lines right before calling of
 :meth:`~robustness.train.train_model`
 suffices for training our network robustly with this custom loss.
 
-As of the latest version of ``robustness``, you can now also supply a custom
-function for computing accuracy using the ``custom_accuracy`` flag. This should
-be a function that takes in the model output and the target labels, and returns
-a tuple of ``(top1, top5)`` accuracies (feel free to make the second element
-``float('nan')`` if there's only one accuracy metric you want to display). Here
-is an example:
-
-.. code-block:: python
-
-    def custom_acc_func(out, targ):
-        # Calculate top1 and top5 accuracy for this batch here
-        return 100., float('nan') # Return (top1, top5)
-    
-    train_args.custom_accuracy = custom_acc_func
-
-
 .. _using-custom-loaders:
 
 Training networks with custom data loaders
