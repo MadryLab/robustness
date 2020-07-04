@@ -4,7 +4,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from robustness.tools.custom_modules import FakeReLU
+from ..tools.custom_modules import FakeReLU
 
 
 class Bottleneck(nn.Module):

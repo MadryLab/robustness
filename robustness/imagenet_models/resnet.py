@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.hub import load_state_dict_from_url
-from robustness.tools.custom_modules import SequentialWithArgs, FakeReLU
+from ..tools.custom_modules import SequentialWithArgs, FakeReLU
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
