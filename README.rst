@@ -247,6 +247,4 @@ Maintainers
 
 Contributors/Commiters
 '''''''''''''''''''''''
-- Kristian Georgiev
-- `iamgroot42 <https://github.com/MadryLab/robustness/pulls/iamgroot42>`_
-- `TLMichael <https://github.com/TLMichael>`_
+- See `here <https://github.com/MadryLab/robustness/pulse>`_ 
