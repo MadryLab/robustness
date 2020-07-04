@@ -7,26 +7,7 @@ Reference:
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-class FakeReLU(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, input):
-        return input.clamp(min=0)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        return grad_output
-
-class SequentialWithArgs(torch.nn.Sequential):
-    def forward(self, input, *args, **kwargs):
-        vs = list(self._modules.values())
-        l = len(vs)
-        for i in range(l):
-            if i == l-1:
-                input = vs[i](input, *args, **kwargs)
-            else:
-                input = vs[i](input)
-        return input
+from ..tools.custom_modules import SequentialWithArgs, FakeReLU
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -131,7 +112,7 @@ def ResNet18(**kwargs):
     return ResNet(BasicBlock, [2,2,2,2], **kwargs)
 
 def ResNet18Wide(**kwargs):
-    return ResNet(BasicBlock, [2,2,2,2], wd=1.5, **kwargs)
+    return ResNet(BasicBlock, [2,2,2,2], wm=5, **kwargs)
 
 def ResNet18Thin(**kwargs):
     return ResNet(BasicBlock, [2,2,2,2], wd=.75, **kwargs)
@@ -152,9 +133,9 @@ resnet50 = ResNet50
 resnet18 = ResNet18
 resnet101 = ResNet101
 resnet152 = ResNet152
+resnet18wide = ResNet18Wide
 
 # resnet18thin = ResNet18Thin
-# resnet18wide = ResNet18Wide
 def test():
     net = ResNet18()
     y = net(torch.randn(1,3,32,32))

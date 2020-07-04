@@ -15,7 +15,7 @@ Currently supported datasets:
 datasets to the library.
 """
 
-import os
+import pathlib
 
 import torch as ch
 import torch.utils.data
@@ -23,6 +23,7 @@ from . import imagenet_models, cifar_models
 from torchvision import transforms, datasets
 
 from .tools import constants
+from .tools import openimgs_helpers
 from . import data_augmentation as da
 from . import loaders
 
@@ -77,6 +78,19 @@ class DataSet(object):
         self.ds_name = ds_name
         self.data_path = data_path
         self.__dict__.update(kwargs)
+    
+    def override_args(self, default_args, new_args):
+        '''
+        Convenience method for overriding arguments. (Internal)
+        '''
+        kwargs = {k: v for (k, v) in new_args.items() if v is not None}
+        extra_args = set(kwargs.keys()) - set(default_args.keys()) 
+        if len(extra_args) > 0: raise ValueError(f"Invalid arguments: {extra_args}")
+        for k in kwargs:
+            req_type = type(default_args[k])
+            if not isinstance(kwargs[k], req_type):
+                raise ValueError(f"Argument {k} should have type {req_type}")
+        return {**default_args, **kwargs}
 
     def get_model(self, arch, pretrained):
         '''
@@ -97,8 +111,8 @@ class DataSet(object):
         raise NotImplementedError
 
     def make_loaders(self, workers, batch_size, data_aug=True, subset=None, 
-                 subset_start=0, subset_type='rand', val_batch_size=None,
-                 only_val=False, shuffle_train=True, shuffle_val=True):
+                    subset_start=0, subset_type='rand', val_batch_size=None,
+                    only_val=False, shuffle_train=True, shuffle_val=True, subset_seed=None):
         '''
         Args:
             workers (int) : number of workers for data fetching (*required*).
@@ -147,6 +161,7 @@ class DataSet(object):
                                     subset_start=subset_start,
                                     subset_type=subset_type,
                                     only_val=only_val,
+                                    seed=subset_seed,
                                     shuffle_train=shuffle_train,
                                     shuffle_val=shuffle_val)
 
@@ -174,7 +189,39 @@ class ImageNet(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(ImageNet, self).__init__('imagenet', data_path, **ds_kwargs)
+
+    def get_model(self, arch, pretrained):
+        """
+        """
+        return imagenet_models.__dict__[arch](num_classes=self.num_classes, 
+                                        pretrained=pretrained)
+
+class Places365(DataSet):
+    '''
+    Places365 Dataset [ZLK+17]_, a 365-class scene recognition dataset.
+
+    See `the places2 webpage <http://places2.csail.mit.edu>`_
+    for information on how to download this dataset.
+
+    .. [ZLK+17] Zhou, B., Lapedriza, A., Khosla, A., Oliva, A., & Torralba, A.  (2017). Places: A 10 million Image Database for Scene Recognition. IEEE Transactions on Pattern Analysis and Machine Intelligence.
+
+    '''
+    def __init__(self, data_path, **kwargs):
+        """
+        """
+        ds_kwargs = {
+            'num_classes': 365,
+            'mean': ch.tensor([0.485, 0.456, 0.406]),
+            'std': ch.tensor([0.229, 0.224, 0.225]),
+            'custom_class': None,
+            'label_mapping': None, 
+            'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(256),
+            'transform_test': da.TEST_TRANSFORMS_DEFAULT(256)
+        }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
+        super(Places365, self).__init__('places365', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
         """
@@ -219,6 +266,7 @@ class RestrictedImageNet(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(RestrictedImageNet, self).__init__(ds_name,
                 data_path, **ds_kwargs)
 
@@ -254,6 +302,7 @@ class CustomImageNet(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(CustomImageNet, self).__init__(ds_name,
                 data_path, **ds_kwargs)
 
@@ -297,6 +346,7 @@ class CIFAR(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(32),
             'transform_test': da.TEST_TRANSFORMS_DEFAULT(32)
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(CIFAR, self).__init__('cifar', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
@@ -330,6 +380,7 @@ class CINIC(DataSet):
             'transform_train': da.TRAIN_TRANSFORMS_DEFAULT(32),
             'transform_test': da.TEST_TRANSFORMS_DEFAULT(32)
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(CINIC, self).__init__('cinic', data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained):
@@ -358,7 +409,7 @@ class A2B(DataSet):
     def __init__(self, data_path, **kwargs):
         """
         """
-        _, ds_name = os.path.split(data_path)
+        ds_name = pathlib.Path(data_path).parts[-1]
         valid_names = ['horse2zebra', 'apple2orange', 'summer2winter_yosemite']
         assert ds_name in valid_names, \
                 f"path must end in one of {valid_names}, not {ds_name}"
@@ -371,6 +422,7 @@ class A2B(DataSet):
             'label_mapping': None,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
         super(A2B, self).__init__(ds_name, data_path, **ds_kwargs)
 
     def get_model(self, arch, pretrained=False):
@@ -380,13 +432,52 @@ class A2B(DataSet):
             raise ValueError('A2B does not support pytorch_pretrained=True')
         return imagenet_models.__dict__[arch](num_classes=self.num_classes)
 
+class OpenImages(DataSet):
+    """
+    OpenImages dataset [KDA+17]_
+
+    More info: https://storage.googleapis.com/openimages/web/index.html
+
+    600-way classification with graular labels and bounding boxes.
+
+    ..[KDA+17] Krasin I., Duerig T., Alldrin N., Ferrari V., Abu-El-Haija S.,
+    Kuznetsova A., Rom H., Uijlings J., Popov S., Kamali S., Malloci M.,
+    Pont-Tuset J., Veit A., Belongie S., Gomes V., Gupta A., Sun C., Chechik G.,
+    Cai D., Feng Z., Narayanan D., Murphy K. (2017). OpenImages: A public
+    dataset for large-scale multi-label and multi-class image classification.
+    Available from https://storage.googleapis.com/openimages/web/index.html. 
+    """
+    def __init__(self, data_path, **kwargs):
+        """
+        """
+        ds_kwargs = {
+            'num_classes': 601,
+            'mean': ch.tensor([0.4859, 0.4131, 0.3083]),
+            'std': ch.tensor([0.2919, 0.2507, 0.2273]),
+            'custom_class': openimgs_helpers.OIDatasetFolder,
+            'label_mapping': None, 
+            'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
+            'transform_test': da.TEST_TRANSFORMS_IMAGENET
+        }
+        ds_kwargs = self.override_args(ds_kwargs, kwargs)
+        super(OpenImages, self).__init__('openimages', data_path, **ds_kwargs)
+
+    def get_model(self, arch, pretrained):
+        """
+        """
+        if pretrained:
+            raise ValueError('OpenImages does not support pytorch_pretrained=True')
+        return imagenet_models.__dict__[arch](num_classes=self.num_classes)
+
 DATASETS = {
     'imagenet': ImageNet,
     'restricted_imagenet': RestrictedImageNet,
     'custom_imagenet': CustomImageNet,
     'cifar': CIFAR,
     'cinic': CINIC,
-    'a2b': A2B
+    'a2b': A2B,
+    'places365': Places365,
+    'openimages': OpenImages
 }
 '''
 Dictionary of datasets. A dataset class can be accessed as:
