@@ -277,9 +277,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
     writer = store.tensorboard if store else None
     prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
     if store is not None: 
-        consts.CKPTS_SCHEMA[prec1_key] = store.PYTORCH_STATE
         store.add_table(consts.LOGS_TABLE, consts.LOGS_SCHEMA)
-        store.add_table(consts.CKPTS_TABLE, consts.CKPTS_SCHEMA)
     
     # Reformat and read arguments
     check_required_args(args) # Argument sanity check
@@ -366,8 +364,6 @@ def train_model(args, model, loaders, *, checkpoint=None,
             if store: store[consts.LOGS_TABLE].append_row(log_info)
             # If we are at a saving epoch (or the last epoch), save a checkpoint
             if should_save_ckpt or last_epoch: save_checkpoint(ckpt_at_epoch(epoch))
-            # If  store exists and this is the last epoch, save a checkpoint
-            if last_epoch and store: store[consts.CKPTS_TABLE].append_row(sd_info)
 
             # Update the latest and best checkpoints (overrides old one)
             save_checkpoint(consts.CKPT_NAME_LATEST)
