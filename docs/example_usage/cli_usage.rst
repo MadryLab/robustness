@@ -54,19 +54,13 @@ are below:
      --momentum MOMENTUM   SGD momentum parameter (default: 0.9)
      --step-lr STEP_LR     number of steps between 10x LR drops (default: by
                            dataset)
-     --step-lr-gamma GAMMA multiplier for each LR drop (default: 0.1, i.e., 10x drops)
-     --custom-lr-multiplier CUSTOM_SCHEDULE
+     --custom-schedule CUSTOM_SCHEDULE
                            LR sched (format: [(epoch, LR),...]) (default: None)
-     --lr-interpolation {linear, step} 
-                           How to interpolate between learning rates (default: step)
      --log-iters LOG_ITERS
                            how frequently (in epochs) to log (default: 5)
      --save-ckpt-iters SAVE_CKPT_ITERS
                            how frequently (epochs) to save (-1 for bash, only
                            saves best and last) (default: -1)
-     --mixed-precision {0, 1}
-                           Whether to use mixed-precision training (needs
-                           to be compiled with NVIDIA AMP support)
 
 Finally, there is one additional argument, :samp:`--adv-eval {0,1}`, that enables
 adversarial evaluation of the non-robust model as it is being trained (i.e.
@@ -96,8 +90,8 @@ supply all the necessary hyperparameters for the attack:
                            (choices: {arg_type}, default: 1)
      --random-restarts RANDOM_RESTARTS
                            number of random PGD restarts for eval (default: 0)
-     --custom-eps-multiplier EPS_SCHEDULE
-                           epsilon multiplier sched (same format as LR schedule)
+     --eps-fadein-epochs EPS_FADEIN_EPOCHS
+                           fade in eps over this many iterations (default: 0)
 
 
 Evaluating trained models

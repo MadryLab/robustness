@@ -22,6 +22,13 @@ ATTACK_KWARG_KEYS = [
         'random_start',
         'random_restarts']
 
+CKPTS_SCHEMA = {
+    'epoch':int,
+    'model': store.PYTORCH_STATE,
+    'optimizer': store.PYTORCH_STATE,
+    'schedule': store.PYTORCH_STATE
+}
+
 LOGS_SCHEMA = {
     'epoch':int,
     'nat_prec1':float,
@@ -34,4 +41,5 @@ LOGS_SCHEMA = {
 }
 
 LOGS_TABLE = 'logs'
+CKPTS_TABLE = 'ckpts'
 
