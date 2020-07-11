@@ -122,7 +122,6 @@ class L2Step(AttackerStep):
     def step(self, x, g):
         """
         """
-        # Scale g so that each element of the batch is at least norm 1
         l = len(x.shape) - 1
         g_norm = ch.norm(g.view(g.shape[0], -1), dim=1).view(-1, *([1]*l))
         scaled_g = g / (g_norm + 1e-10)

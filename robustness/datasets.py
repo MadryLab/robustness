@@ -88,7 +88,8 @@ class DataSet(object):
         if len(extra_args) > 0: raise ValueError(f"Invalid arguments: {extra_args}")
         for k in kwargs:
             req_type = type(default_args[k])
-            if not isinstance(kwargs[k], req_type):
+            no_nones = (default_args[k] is not None) and (kwargs[k] is not None)
+            if no_nones and (not isinstance(kwargs[k], req_type)):
                 raise ValueError(f"Argument {k} should have type {req_type}")
         return {**default_args, **kwargs}
 
