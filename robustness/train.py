@@ -118,7 +118,7 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
             for i in range(steps_to_take):
                 schedule.step()
         
-        if 'amp' in checkpoint and checkpoint['amp'] is not None:
+        if 'amp' in checkpoint and checkpoint['amp'] not in [None, 'N/A']:
             amp.load_state_dict(checkpoint['amp'])
 
         # TODO: see if there's a smarter way to do this
