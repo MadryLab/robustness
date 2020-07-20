@@ -13,6 +13,8 @@ upcoming code releases. A few projects using the library include:
 - `Code for "Learning Perceptually-Aligned Representations via Adversarial Robustness" <https://github.com/MadryLab/robust_representations>`_ (https://arxiv.org/abs/1906.00945) 
 - `Code for
   "Image Synthesis with a Single (Robust) Classifier" <https://github.com/MadryLab/robustness_applications>`_ (https://arxiv.org/abs/1906.09453)
+- `Code for
+  "Do Adversarially Robust ImageNet Models Transfer Better?" <https://github.com/microsoft/robust-models-transfer>`_ (https://arxiv.org/abs/2007.08489)
 
 We
 demonstrate how to use the library in a set of walkthroughs and our API
