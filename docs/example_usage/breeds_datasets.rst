@@ -30,7 +30,7 @@ At a high-level, the procedure to construct BREEDS datasets is as follows:
 .. raw:: html
 
    <i class="fa fa-play"></i> &nbsp;&nbsp; <a
-   href="https://github.com/MadryLab/robustness/blob/master/notebooks/Breeds%20Datasets.ipynb">Download
+   href="https://github.com/MadryLab/BREEDS-Benchmarks/blob/master/Constructing%20BREEDS%20datasets.ipynb">Download
    a Jupyter notebook</a> containing all the code from this walkthrough! <br />
    <br />
 
