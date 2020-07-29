@@ -45,14 +45,25 @@ To create BREEDS datasets using ImageNet, we need to create a:
     child ID (space separated)---in the class hierarchy. 
   - ``node_names.txt``: Each line contains the ID of a node followed by
     it's name (tab separated).
-  For ImageNet, you can download the relevant files from `here <https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified>`_ and move them
-  to ``info_dir``. 
+
+For ImageNet, you can manually download the relevant files for the class hierarchy 
+from `here <https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified>`_ and move them to ``info_dir``. Alternatively, you can do it automatically
+using by specifying an empty ``info_dir`` to 
+:meth:`~robustness.tools.breeds_helpers.BreedsDatasetGenerator.get_superclasses`:
+
+.. code-block:: python
+
+   from robustness.tools.breeds_helpers import setup_breeds
+   setup_breeds(info_dir)
+
 
 Part 1: Browsing through the Class Hierarchy
 ''''''''''''''''''''''''''''''''''''''''''''
 
 We can use :class:`~robustness.tools.breeds_helpers.ClassHierarchy` to
-examine a dataset's (here, ImageNet) class hierarchy. 
+examine a dataset's (here, ImageNet) class hierarchy. Here, ``info_dir`` 
+should contain the requisite files for the class hierarchy (from the Setup
+step):
 
 .. code-block:: python
 
@@ -128,7 +139,7 @@ To create a dataset composed of superclasses, we use the
 :class:`~robustness.tools.breeds_helpers.BreedsDatasetGenerator`.
 Internally, this class instantiates an object of 
 :class:`~robustness.tools.breeds_helpers.ClassHierarchy` and uses it
-to define the superclasses.
+to define the superclasses. 
 
 .. code-block:: python
 
@@ -136,7 +147,7 @@ to define the superclasses.
   DG = BreedsDatasetGenerator(info_dir)
 
 Specifically, we will use  
-py:meth:`~robustness.tools.breeds_helpers.BreedsDatasetGenerator.get_superclasses`.
+:meth:`~robustness.tools.breeds_helpers.BreedsDatasetGenerator.get_superclasses`.
 This function takes in the following arguments (see :meth:`this docstring
 <robustness.tools.breeds_helpers.BreedsDatasetGenerator.get_superclasses>` for more details):
 
@@ -159,26 +170,25 @@ being less adversarial as follows:
 
 .. code-block:: python
 
-   ret = DG.get_superclasses(level=2, 
-                          Nsubclasses=None, 
-                          split="rand", 
-                          ancestor=None, 
-                          balanced=True)
-  subclass_ranges, label_map, subclass_tuple, superclasses = ret                                    
+  ret = DG.get_superclasses(level=2, 
+                        Nsubclasses=None, 
+                        split="rand", 
+                        ancestor=None, 
+                        balanced=True)
+  superclasses, subclass_split, label_map = ret                                 
 
 This method returns:
 
 - :samp:`superclasses` is a list containing the IDs of all the
   superclasses.
-- :samp:`label_map` is a dictionary mapping a superclass
-  number (label) to name. 
-- :samp:`subclass_ranges` is a list, which for
-  each superclass, contains a list of subclasses included (in both
-  domains). 
 - :samp:`subclass_tuple` is a tuple of subclass ranges for
   the source and target domains. For instance,
   :samp:`subclass_tuple[0]` is a list, which for each superclass,
   contains a list of subclasses present in the source domain.
+  If ``split=None``, subclass_tuple[1] is empty and can be
+  ignored.
+- :samp:`label_map` is a dictionary mapping a superclass
+  number (label) to name. 
 
 You can experiment with these parameters to create datasets of different
 granularity. For instance, you could specify the :samp:`Nsubclasses` to
@@ -194,24 +204,27 @@ superclasses/subclasses it contains---using:
 
   from robustness.tools.breeds_helpers import print_dataset_info
 
-  print_dataset_info(subclass_ranges, 
-                    label_map, 
-                    subclass_tuple, 
-                    superclasses, 
-                    hier.LEAF_NUM_TO_NAME)
+  print_dataset_info(superclasses, 
+                     subclass_split, 
+                     label_map, 
+                     hier.LEAF_NUM_TO_NAME)
 
 Finally, for the source and target domains, we can create datasets
 and their corresponding loaders:
 
 .. code-block:: python
 
-  from robustness.datasets import DATASETS
-  dataset_source = DATASETS['custom_imagenet'](data_dir, subclass_tuple[0])
-  train_loader_source, val_loader_source = dataset_source.make_loaders(num_workers, 
-                                                                     batch_size)
-  dataset_target = DATASETS['custom_imagenet'](data_dir, subclass_tuple[1])
-  train_loader_target, val_loader_target = dataset_source.make_loaders(num_workers, 
-                                                                     batch_size)
+  from robustness import datasets
+  
+  train_subclasses, test_subclasses = subclass_split
+
+  dataset_source = datasets.CustomImageNet(data_dir, train_subclasses)
+  loaders_source = dataset_source.make_loaders(num_workers, batch_size)
+  train_loader_source, val_loader_source = loaders_source
+
+  dataset_target = datasets.CustomImageNet(data_dir, test_subclasses)
+  loaders_target = dataset_source.make_loaders(num_workers, batch_size)
+  train_loader_target, val_loader_target = loaders_target
 
 You're all set! You can then use this :samp:`custom_dataset` and loaders
 just as you would any other existing/custom dataset in the robustness 
@@ -234,18 +247,19 @@ partitioned across domains:
 
 .. code-block:: python
 
-  ret = DG.get_superclasses(level=level, 
-                            Nsubclasses=Nsubclasses, 
+  ret = DG.get_superclasses(level=2, 
+                            Nsubclasses=2, 
                             split=None, 
-                            ancestor=ancestor, 
-                            balanced=balanced)
-  subclass_ranges, label_map, subclass_tuple, superclasses, _ = ret
-  dataset = DATASETS['custom_imagenet'](data_dir, subclass_ranges)
+                            ancestor=None, 
+                            balanced=True)
+  superclasses, subclass_split, label_map = ret
+  all_subclasses = subclass_split[0]
 
-  print_dataset_info(subclass_ranges, 
+  dataset = datasets.CustomImageNet(data_dir, all_subclasses)
+
+  print_dataset_info(superclasses,
+                     subclass_split, 
                      label_map, 
-                     subclass_tuple, 
-                     superclasses, 
                      hier.LEAF_NUM_TO_NAME)
 
 Part 3: Loading in-built BREEDS Datasets
@@ -259,7 +273,12 @@ and ``Nonliving26``. Loading any of these datasets is relatively simple:
 
   from robustness.tools.breeds_helpers import make_living17
   ret = make_living17(info_dir, split="rand")
-  subclass_ranges, label_map, subclass_tuple, superclasses, _ = ret
+  superclasses, subclass_split, label_map = ret
+
+  print_dataset_info(superclasses, 
+                     subclass_split,
+                     label_map, 
+                     hier.LEAF_NUM_TO_NAME)
 
 You can then use a similar methodology to Part 2 above to probe
 dataset information and create datasets and loaders.

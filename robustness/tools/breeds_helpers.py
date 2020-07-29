@@ -2,10 +2,23 @@ import sys, os
 import json
 import numpy as np
 import pandas as pd
+import urllib
 from collections import OrderedDict, Counter
 import operator
 import networkx as nx
 from ..datasets import DATASETS
+
+REQUIRED_FILES = ['dataset_class_info.json',
+                  'class_hierarchy.txt',
+                  'node_names.txt']
+IMAGENET_FILE_PATH = "https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified"
+
+def setup_breeds(info_dir, url=IMAGENET_FILE_PATH):
+    print(f"Downloading files from {url} to {info_dir}")
+    if not os.path.exists(info_dir):
+        os.makedirs(info_dir)
+    for f in REQUIRED_FILES:
+        urllib.request.urlretrieve(url + f"/{f}", info_dir + f"/{f}")
 
 class ClassHierarchy():
     '''
@@ -19,11 +32,7 @@ class ClassHierarchy():
                 "node_names.txt" mapping nodes to names, and "class_info.json".
         """
 
-        required_files = ['dataset_class_info.json',
-                          'class_hierarchy.txt',
-                          'node_names.txt']
-
-        for f in required_files:
+        for f in REQUIRED_FILES:
             if not os.path.exists(f'{info_dir}/{f}'):
                 raise Exception(f"Missing files: `info_dir` does not "
                                  "contain required file {f}")
@@ -355,15 +364,15 @@ class BreedsDatasetGenerator():
             rng (RandomState): Random number generator
 
         Returns:
-            subclass_ranges (list): Each entry is a list of subclasses 
-                                    for a given superclass in the dataset
-            label_map (dict): Map from class number to superclass name 
-            subclass_tuple (tuple): Tuple of lists capturing the split.
-                                    If split is None, lists are empty.
-                                    Otherwise, each list entry is 
-                                    a list of subclasses for a given 
-                                    superclass in the dataset
             superclasses (list): WordNet IDs of superclasses
+            subclass_splits (tuple): Tuple entries correspond to the source 
+                                     and target domains respectively. A 
+                                     tuple entry is a list, where each 
+                                     element is a list of subclasses to 
+                                     be included in a given superclass in
+                                     that domain. If split is None,
+                                     the second tuple element is empty.
+            label_map (dict): Map from (super)class number to superclass name 
         """ 
 
         rng = np.random.RandomState(random_seed)
@@ -400,8 +409,6 @@ class BreedsDatasetGenerator():
         label_map = {}
         for ri, r in enumerate(superclasses):
             label_map[ri] = self.hierarchy.node_name(r)
-
-        subclass_ranges, subclass_tuple = [], ([], [])
         
         if split is None:
 
@@ -412,36 +419,37 @@ class BreedsDatasetGenerator():
             wnids = [list(rng.choice(d, n, replace=False))
                                    for n, d in zip(Ns, all_subclasses)] 
             subclass_ranges = [[self.hierarchy.LEAF_ID_TO_NUM[w] for w in c] for c in wnids]
+            subclass_splits = (subclass_ranges, [])
         else:
+            subclass_splits = ([], [])
             for sci, sc in enumerate(sorted(superclasses)):
                 class_tup = self.split_superclass(sc, Nsubclasses=Nsubclasses, 
                                                      balanced=balanced,
                                                      split_type=split, rng=rng)
-                subclass_tuple[0].append(class_tup[0])
-                subclass_tuple[1].append(class_tup[1])
-                subclass_ranges.append(class_tup[0] + class_tup[1])
+                subclass_splits[0].append(class_tup[0])
+                subclass_splits[1].append(class_tup[1])
 
-        return superclasses, subclass_ranges, subclass_tuple, label_map
+        return superclasses, subclass_splits, label_map
 
-def print_dataset_info(subclass_ranges, 
+def print_dataset_info(superclasses, 
+                       subclass_splits,
                        label_map, 
-                       subclass_tuple, 
-                       superclasses,
                        label_map_sub):
     """
     Obtain a dataframe with information about the 
     superclasses/subclasses included in the dataset.
 
     Args:
-        subclass_ranges (list): Each entry is a list of subclasses 
-                                for a given superclass in the dataset
-        label_map (dict): Map from class number to superclass name 
-        subclass_tuple (tuple): Tuple of lists capturing the split; 
-                                each list entry is 
-                                a list of subclasses for a given 
-                                superclass in the dataset
-        superclasses (list): WordNet IDs of superclasses
-        label_map_sub (dict):  Map from subclass number to subclass name 
+    superclasses (list): WordNet IDs of superclasses
+    subclass_splits (tuple): Tuple entries correspond to the source 
+                             and target domains respectively. A 
+                             tuple entry is a list, where each 
+                             element is a list of subclasses to 
+                             be included in a given superclass in
+                             that domain. If split is None,
+                             the second tuple element is empty.
+    label_map (dict): Map from (super)class number to superclass name 
+    label_map_sub (dict):  Map from subclass number to subclass name 
                               (equivalent to label map for original dataset)
     Returns:
         dataDf (pandas DataFrame): Columns contain relevant information 
@@ -451,19 +459,21 @@ def print_dataset_info(subclass_ranges,
     def print_names(class_idx):
         return [f'{label_map_sub[r].split(",")[0]} ({r})'
                                        for r in class_idx]
-    
-    data = {'superclass': [],
-            'subclasses': []}
-    if len(subclass_tuple[0]):
-        data.update({'source domain': [],
-                        'target domain': []})
+    data = {'superclass': []}
+    contains_split = len(subclass_splits[1])
+    if contains_split:
+        data.update({'subclasses (source)': [],
+                     'subclasses (target)': []})
+    else:
+        data.update({'subclasses': []})
         
     for i, (k, v) in enumerate(label_map.items()):
         data['superclass'].append(f'{v}')
-        data['subclasses'].append(print_names(subclass_ranges[i]))
-        if len(subclass_tuple[0]):
-            data['source domain'].append(print_names(subclass_tuple[0][i]))
-            data['target domain'].append(print_names(subclass_tuple[1][i]))
+        if contains_split:
+            data['subclasses (source)'].append(print_names(subclass_splits[0][i]))
+            data['subclasses (target)'].append(print_names(subclass_splits[1][i]))
+        else:
+            data['subclasses'].append(print_names(subclass_splits[0][i]))
 
     dataDf = pd.DataFrame(data)
     return dataDf
@@ -477,14 +487,15 @@ def make_entity13(info_dir, split=None):
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
     Returns:
-        subclass_ranges (list): Each entry is a list of subclasses 
-                                for a given superclass in the dataset
-        label_map (dict): Map from class number to superclass name 
-        subclass_tuple (tuple): Tuple of lists capturing the split; 
-                                each list entry is 
-                                a list of subclasses for a given 
-                                superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
+        subclass_splits (tuple): Tuple entries correspond to the source 
+                                 and target domains respectively. A 
+                                 tuple entry is a list, where each 
+                                 element is a list of subclasses to 
+                                 be included in a given superclass in
+                                 that domain. If split is None,
+                                 the second tuple element is empty.
+        label_map (dict): Map from (super)class number to superclass name 
 
     """ 
 
@@ -504,14 +515,15 @@ def make_entity30(info_dir, split=None):
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
     Returns:
-        subclass_ranges (list): Each entry is a list of subclasses 
-                                for a given superclass in the dataset
-        label_map (dict): Map from class number to superclass name 
-        subclass_tuple (tuple): Tuple of lists capturing the split; 
-                                each list entry is 
-                                a list of subclasses for a given 
-                                superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
+        subclass_splits (tuple): Tuple entries correspond to the source 
+                                 and target domains respectively. A 
+                                 tuple entry is a list, where each 
+                                 element is a list of subclasses to 
+                                 be included in a given superclass in
+                                 that domain. If split is None,
+                                 the second tuple element is empty.
+        label_map (dict): Map from (super)class number to superclass name 
 
     """ 
     DG = BreedsDatasetGenerator(info_dir)
@@ -530,14 +542,15 @@ def make_living17(info_dir, split=None):
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
     Returns:
-        subclass_ranges (list): Each entry is a list of subclasses 
-                                for a given superclass in the dataset
-        label_map (dict): Map from class number to superclass name 
-        subclass_tuple (tuple): Tuple of lists capturing the split; 
-                                each list entry is 
-                                a list of subclasses for a given 
-                                superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
+        subclass_splits (tuple): Tuple entries correspond to the source 
+                                 and target domains respectively. A 
+                                 tuple entry is a list, where each 
+                                 element is a list of subclasses to 
+                                 be included in a given superclass in
+                                 that domain. If split is None,
+                                 the second tuple element is empty.
+        label_map (dict): Map from (super)class number to superclass name 
 
     """ 
     DG = BreedsDatasetGenerator(info_dir)
@@ -556,14 +569,15 @@ def make_nonliving26(info_dir, split=None):
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
     Returns:
-        subclass_ranges (list): Each entry is a list of subclasses 
-                                for a given superclass in the dataset
-        label_map (dict): Map from class number to superclass name 
-        subclass_tuple (tuple): Tuple of lists capturing the split; 
-                                each list entry is 
-                                a list of subclasses for a given 
-                                superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
+        subclass_splits (tuple): Tuple entries correspond to the source 
+                                 and target domains respectively. A 
+                                 tuple entry is a list, where each 
+                                 element is a list of subclasses to 
+                                 be included in a given superclass in
+                                 that domain. If split is None,
+                                 the second tuple element is empty.
+        label_map (dict): Map from (super)class number to superclass name 
 
     """ 
     DG = BreedsDatasetGenerator(info_dir)
