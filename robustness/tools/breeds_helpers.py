@@ -18,6 +18,15 @@ class ClassHierarchy():
                 "class_hierarchy.txt" file with one edge per line, a
                 "node_names.txt" mapping nodes to names, and "class_info.json".
         """
+
+        required_files = ['dataset_class_info.json',
+                          'class_hierarchy.txt',
+                          'node_names.txt']
+
+        for f in required_files:
+            if not os.path.exists(f'{info_dir}/{f}'):
+                raise Exception(f"Missing files: `info_dir` does not "
+                                 "contain required file {f}")
         
         # Details about dataset class (sleaves) names, IDS
         with open(f'{info_dir}/dataset_class_info.json', 'r') as f:
@@ -355,10 +364,6 @@ class BreedsDatasetGenerator():
                                     a list of subclasses for a given 
                                     superclass in the dataset
             superclasses (list): WordNet IDs of superclasses
-            all_subclasses (list): For each superclass, a list of all 
-                                    possible descendants (including
-                                    those omitted from `subclass_ranges`)
-
         """ 
 
         rng = np.random.RandomState(random_seed)
@@ -416,7 +421,7 @@ class BreedsDatasetGenerator():
                 subclass_tuple[1].append(class_tup[1])
                 subclass_ranges.append(class_tup[0] + class_tup[1])
 
-        return subclass_ranges, label_map, subclass_tuple, superclasses, all_subclasses
+        return superclasses, subclass_ranges, subclass_tuple, label_map
 
 def print_dataset_info(subclass_ranges, 
                        label_map, 
@@ -465,9 +470,9 @@ def print_dataset_info(subclass_ranges,
 
 
 # Some standard datasets from the BREEDS paper.
-def Entity13(info_dir, split=None):
+def make_entity13(info_dir, split=None):
     """
-    ENTITY-13 Dataset
+    Obtain superclass/subclass information for the ENTITY-13 dataset
     Args:
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
@@ -480,8 +485,6 @@ def Entity13(info_dir, split=None):
                                 a list of subclasses for a given 
                                 superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
-        all_subclasses (list): List of all possible subclasses included in 
-                                superclass
 
     """ 
 
@@ -494,9 +497,9 @@ def Entity13(info_dir, split=None):
                        random_seed=2,
                        verbose=False)
 
-def Entity30(info_dir, split=None):
+def make_entity30(info_dir, split=None):
     """
-    ENTITY-30 Dataset
+    Obtain superclass/subclass information for the ENTITY-30 dataset
     Args:
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
@@ -509,8 +512,6 @@ def Entity30(info_dir, split=None):
                                 a list of subclasses for a given 
                                 superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
-        all_subclasses (list): List of all possible subclasses included in 
-                                superclass
 
     """ 
     DG = BreedsDatasetGenerator(info_dir)
@@ -522,9 +523,9 @@ def Entity30(info_dir, split=None):
                        random_seed=2,
                        verbose=False)
 
-def Living17(info_dir, split=None):
+def make_living17(info_dir, split=None):
     """
-    LIVING-17 Dataset
+    Obtain superclass/subclass information for the LIVING-17 dataset
     Args:
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
@@ -537,8 +538,6 @@ def Living17(info_dir, split=None):
                                 a list of subclasses for a given 
                                 superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
-        all_subclasses (list): List of all possible subclasses included in 
-                                superclass
 
     """ 
     DG = BreedsDatasetGenerator(info_dir)
@@ -550,9 +549,9 @@ def Living17(info_dir, split=None):
                        random_seed=2,
                        verbose=False)
 
-def Nonliving26(info_dir, split=None):
+def make_nonliving26(info_dir, split=None):
     """
-    NONLIVING-26 Dataset
+    Obtain superclass/subclass information for the NONLIVING-26 dataset.
     Args:
         info_dir (str) : Path to ImageNet information files
         split ("good"/"bad"/"rand"/None): Nature of subclass
@@ -565,8 +564,6 @@ def Nonliving26(info_dir, split=None):
                                 a list of subclasses for a given 
                                 superclass in the dataset
         superclasses (list): WordNet IDs of superclasses
-        all_subclasses (list): List of all possible subclasses included in 
-                                superclass
 
     """ 
     DG = BreedsDatasetGenerator(info_dir)

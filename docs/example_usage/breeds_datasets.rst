@@ -1,31 +1,27 @@
 Creating BREEDS subpopulation shift benchmarks
 ===============================================
 
-In this document, we will discuss how to create BREEDS datasets, used in 
-the `code <https://github.com/MadryLab/BREEDS_benchmarks>`_ `release
-<https://github.com/MadryLab/BREEDS_benchmarks>`_ based on our paper [STM20]_. 
-These datasets can be used to study model robustness to subpopulation 
-shift---a specific form of distribution shift wherein the subpopulations of data 
-(e.g., animal breeds) present in the training set (source domain) are 
-entirely different from the test set (target domain). 
-You can create BREEDS datasets from any existing dataset that has 
-an explicit class hierarchy describing the semantic relationship 
-between pairs of classes (e.g., ImageNet, OpenImages). 
-In this walkthrough, we will do so using ImageNet and the corresponding
-class hierarchy from [STM20]_ (modification of WordNet to be better-suited
-for the object recognition task).
+In this document, we will discuss how to create BREEDS datasets [STM20]_.
+Given any existing dataset that comes with a class hierarchy (e.g. ImageNet, 
+OpenImages), BREEDS allows you to make a derivative classification task that 
+can be used to measure robustness to subpopulation shift. To do this, we:
 
-At a high-level, the procedure to construct BREEDS datasets is as follows:
+1. Group together semantically-simlar classes ("breeds") in the dataset 
+   into superclasses.
+2. Define a classification task in terms of these superclasses---with 
+   the twist that the "breeds" used in the training set from each superclasses 
+   are disjoint from the "breeds" used in the test set. 
 
-1. Use the dataset's class hierarchy to define `superclasses` by grouping
-   together semantically similar dataset classes (e.g., define the `dog`` superclass 
-   by aggregating all the dog breed classes). 
-2. Design the classification task to be between different superclasses, so that
-   we have easy access to the individual subpopulations (i.e., the original 
-   dataset classes). Then, for each superclass, we will partition the subpopulations 
-   into the source (used for model training) and target domain without overlap
-   (used for evaluation). 
+As a primitive example, one could take ImageNet (which contains many cat and 
+dog breed classes), and use the BREEDS methodology to come up with a derivative 
+"cats vs dogs" task, where the training set would contain one set of breeds 
+(e.g. Egyptian cat, Tabby Cat vs Labrador, Golden Retriever) and the test set 
+would contain another set (e.g. Persian cat, alley cat vs Mastiff, Poodle).
 
+BREEDS allows you to create subpopulation shift benchmarks of varying difficulty
+automatically, without having to manually group or split up classes, and can be 
+applied to any dataset which has a class hierarchy. In this walkthrough, we will 
+use ImageNet and the corresponding class hierarchy from [STM20]_.
 
 .. raw:: html
 
@@ -38,61 +34,43 @@ Requirements/Setup
 ''''''''''''''''''
 To create BREEDS datasets using ImageNet, we need to create a: 
 
-- ``data_dir`` which contains the dataset (in this case, ImageNet) 
+- ``data_dir`` which contains the dataset  
   in PyTorch-readable format.
-- ``info_dir`` which contains information about the class hierarchy.
-  For ImageNet, you can find the relevant files in the 
-  `imagenet_class_hierarchy/modified` subfolder of our
-  `release <https://github.com/MadryLab/BREEDS_benchmarks>`_. 
+- ``info_dir`` which contains the following information (files) about 
+  the class hierarchy:
+
+  - ``dataset_class_info.json``: A list whose entries are triplets of
+    class number, class ID and class name, for each dataset class.
+  - ``class_hierarchy.txt``: Every line denotes an edge---parent ID followed by 
+    child ID (space separated)---in the class hierarchy. 
+  - ``node_names.txt``: Each line contains the ID of a node followed by
+    it's name (tab separated).
+  For ImageNet, you can download the relevant files from `here <https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified>`_ and move them
+  to ``info_dir``. 
 
 Part 1: Browsing through the Class Hierarchy
 ''''''''''''''''''''''''''''''''''''''''''''
-The :class:`~robustness.tools.breeds_helpers.ClassHierarchy` class allows
-us to probe the class hierarchy. The class hierarchy has a graph structure,
-where a child node is a subclass (an instance) of the parent node and the
-original dataset classes are the leaves. We use a top-down approach to obtain 
-superclasses. Specifically, by defining all nodes as a fixed (user-specified) 
-distance from the root node as superclasses, and treating all the descendant 
-leaves (dataset classes) as subpopulations. 
 
-To browse through the ImageNet class hierarchy, let's create an instance 
-of the ``ClassHierarchy`` class:
+We can use :class:`~robustness.tools.breeds_helpers.ClassHierarchy` to
+examine a dataset's (here, ImageNet) class hierarchy. 
 
 .. code-block:: python
 
    from robustness.tools.breeds_helpers import ClassHierarchy
+   import numpy as np
    hier = ClassHierarchy(info_dir)
-
-
-Here, :samp:`info_dir` should be the path to a folder which contains
-information about the class hierarchy 
-(e.g., ``imagenet_class_hierarchy/modified``). In general, :samp:`info_dir`
-must contain the following files:
-
-- ``dataset_class_info.json``: A list which contains, for every class
-  in the dataset, a triplet of class number, ID (e.g., WordNet ID) and
-  name. 
-- ``class_hierarchy.txt``: Each line should contain
-  information about an edge in the class hierarchy, represented as
-  parent node ID followed    by child node ID (space separated). 
-- ``node_names.txt``: Each line should contain a node ID
-  followed by it's name (tab separated).
-
-
-The :samp:`hier` object contains a ``graph`` attribute that captures the
-hierarchy as a ``networkx`` graph. We can explore some high-level properties
-of the graph, for instance:
-
-.. code-block:: python
-
-  import numpy as np
-  print(f"# Levels in hierarchy: {np.max(list(hier.level_to_nodes.keys()))}")
-  print(f"# Nodes/level:",
+   print(f"# Levels in hierarchy: {np.max(list(hier.level_to_nodes.keys()))}")
+   print(f"# Nodes/level:",
       [f"Level {k}: {len(v)}" for k, v in hier.level_to_nodes.items()])
 
-We can now use top-down clustering to find superclasses---by selecting all
-nodes at a certain depth from the root node (or any other desired ancestor
-node):
+The :samp:`hier` object has a ``graph`` attribute, which represents the class
+hierarchy as a ``networkx`` graph. In this graph, the children of a node
+correspond to its subclasses (e.g., Labrador would be a child of the dog
+class in our primitive example). Note that all the original dataset classes 
+will be the leaves of this graph. 
+
+We can then use this graph to define superclasses---all nodes at a user-specified 
+depth from the root node. For example:
 
 .. code-block:: python
 
@@ -101,19 +79,19 @@ node):
   print(f"Superclasses at level {level}:\n")
   print(", ".join([f"{hier.HIER_NODE_NAME[s]}" for s in superclasses]))
 
-
-For a specific superclass, we can also inspect all the leaves reachable
-from the superclass (which correspond to classes in the dataset):
+Each superclass is made up of multiple "breeds", which simply correspond to
+the leaves (original dataset classes) that are its descendants in the class
+hierarchy:
 
 .. code-block:: python
 
   idx = np.random.randint(0, len(superclasses), 1)[0]
   superclass = list(superclasses)[idx]
-  leaves = hier.leaves_reachable(superclass)
+  subclasses = hier.leaves_reachable(superclass)
   print(f"Superclass: {hier.HIER_NODE_NAME[superclass]}\n")
 
-  print(f"Leaves ({len(leaves)}):")
-  print([f"{hier.LEAF_ID_TO_NAME[l]}" for l in list(leaves)])
+  print(f"Subclasses ({len(subclasses)}):")
+  print([f"{hier.LEAF_ID_TO_NAME[l]}" for l in list(subclasses)])
 
 
 We can also visualize subtrees of the graph with the help of
@@ -186,7 +164,7 @@ being less adversarial as follows:
                           split="rand", 
                           ancestor=None, 
                           balanced=True)
-  subclass_ranges, label_map, subclass_tuple, superclasses, _ = ret                                    
+  subclass_ranges, label_map, subclass_tuple, superclasses = ret                                    
 
 This method returns:
 
@@ -279,8 +257,8 @@ and ``Nonliving26``. Loading any of these datasets is relatively simple:
 
 .. code-block:: python
 
-  from robustness.tools.breeds_helpers import Living17
-  ret = Living17(info_dir, split="rand")
+  from robustness.tools.breeds_helpers import make_living17
+  ret = make_living17(info_dir, split="rand")
   subclass_ranges, label_map, subclass_tuple, superclasses, _ = ret
 
 You can then use a similar methodology to Part 2 above to probe
