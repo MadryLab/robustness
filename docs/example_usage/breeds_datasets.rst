@@ -213,6 +213,7 @@ We can take a closer look at the composition of the dataset---what
 superclasses/subclasses it contains---using:
 
 .. code-block:: python
+
   from robustness.tools.breeds_helpers import print_dataset_info
 
   print_dataset_info(subclass_ranges, 
@@ -225,12 +226,11 @@ Finally, for the source and target domains, we can create datasets
 and their corresponding loaders:
 
 .. code-block:: python
+
   from robustness.datasets import DATASETS
-  # For the source domain
   dataset_source = DATASETS['custom_imagenet'](data_dir, subclass_tuple[0])
   train_loader_source, val_loader_source = dataset_source.make_loaders(num_workers, 
                                                                      batch_size)
-  # For the target domain                                                                     
   dataset_target = DATASETS['custom_imagenet'](data_dir, subclass_tuple[1])
   train_loader_target, val_loader_target = dataset_source.make_loaders(num_workers, 
                                                                      batch_size)
