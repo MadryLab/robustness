@@ -209,7 +209,7 @@ set the :samp:`ancestor` to be a specific node (e.g., ``n00004258``
 to focus on living things), or set :samp:`balanced` to ``False`` 
 to get an imbalanced dataset.
 
-we can take a closer look at the composition of the dataset---what
+We can take a closer look at the composition of the dataset---what
 superclasses/subclasses it contains---using:
 
 .. code-block:: python
