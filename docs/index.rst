@@ -19,6 +19,8 @@ upcoming code releases. A few projects using the library include:
   [EIS+19]_ 
 - `Code <https://github.com/MadryLab/robustness_applications>`_ for
   "Image Synthesis with a Single (Robust) Classifier" [STE+19]_
+- `Code <https://github.com/MadryLab/BREEDS-Benchmarks>`_ for
+  "BREEDS: Benchmarks for Subpopulation Shift" [STM20]_
 
 We demonstrate how to use the library in a set of walkthroughs and our API
 reference. Functionality provided by the library includes:
