@@ -16,7 +16,13 @@ As a primitive example, one could take ImageNet (which contains many cat and
 dog breed classes), and use the BREEDS methodology to come up with a derivative 
 "cats vs dogs" task, where the training set would contain one set of breeds 
 (e.g. Egyptian cat, Tabby Cat vs Labrador, Golden Retriever) and the test set 
-would contain another set (e.g. Persian cat, alley cat vs Mastiff, Poodle).
+would contain another set (e.g. Persian cat, alley cat vs Mastiff, Poodle). Here,
+is a (simplified) pictorial illustration of the BREEDS approach:
+
+.. image:: Figures/breeds_pipeline.png
+  :width: 600
+  :align: center
+  :alt: Illustration of the BREEDS dataset creation pipeline.
 
 BREEDS allows you to create subpopulation shift benchmarks of varying difficulty
 automatically, without having to manually group or split up classes, and can be 
@@ -128,8 +134,9 @@ particular superclass:
   
 For instance, visualizing tree rooted at the ``fungus`` superclass yields:
 
-.. image:: ../figures/graph.png
+.. image:: Figures/breeds_superclasses.png
   :width: 600
+  :align: center
   :alt: Visulization of subtree rooted at a specific superclass.
 
 Part 2: Creating BREEDS Datasets
