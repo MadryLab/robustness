@@ -5,7 +5,8 @@ DATASET_PATHS = {
     'cifar': '/tmp',
     'cinic': '/scratch/datasets/cinic10/',
     'a2b': '/scratch/datasets/A2B/horse2zebra/',
-    'places365': '/scratch/datasets/places2/places365_standard/'
+    'places365': '/scratch/datasets/places2/places365_standard/',
+    'openimages': None
 }
 
 DATASET_PATHS = {
@@ -15,5 +16,6 @@ DATASET_PATHS = {
     'cifar': '/tmp',
     'cinic': None,
     'a2b': None,
-    'places365': None
+    'places365': None,
+    'openimages': None
 }

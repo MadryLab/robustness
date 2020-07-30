@@ -151,3 +151,18 @@ class TestSubsets:
             assert ch.all(next(iter(tl))[1] == next(iter(tl_p))[1])
 
 
+class DummyDataset():
+    def __init__(self, root, len=100, *args, **kwargs):
+        self.root = root
+        self.len = len
+        self.data = ch.rand(self.len, 3, 40, 40)
+        self.labels = ch.randint(high=10, size=(self.len,))
+    
+    def __getitem__(self, i): return self.data[i], self.labels[i]
+    def __len__(self): return len(self.data)
+
+class TestCustomClass:
+    def test_simple_custom_class(self, standard_datasets):
+        for ds, path in standard_datasets:
+            ds = ds(path, custom_class=DummyDataset)
+            tl, vl = ds.make_loaders(batch_size=10, workers=0)
