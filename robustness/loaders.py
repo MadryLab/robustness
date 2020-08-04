@@ -60,10 +60,8 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
     else:
         if not only_val:
             train_set = custom_class(root=data_path, train=True, 
-                                        label_mapping=label_mapping,
                                         download=True, transform=transform_train)
         test_set = custom_class(root=data_path, train=False, 
-                                    label_mapping=label_mapping,
                                     download=True, transform=transform_test)
 
     if not only_val:
