@@ -6,8 +6,7 @@ from torchvision.utils import make_grid
 from cox.utils import Parameters
 
 from .tools import helpers
-from .tools.helpers import AverageMeter, save_checkpoint, \
-                                ckpt_at_epoch, has_attr
+from .tools.helpers import AverageMeter, ckpt_at_epoch, has_attr
 from .tools import constants as consts
 import dill 
 import os
@@ -276,9 +275,9 @@ def train_model(args, model, loaders, *, checkpoint=None,
     """
     # Logging setup
     writer = store.tensorboard if store else None
+    prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
     if store is not None: 
         store.add_table(consts.LOGS_TABLE, consts.LOGS_SCHEMA)
-        store.add_table(consts.CKPTS_TABLE, consts.CKPTS_SCHEMA)
     
     # Reformat and read arguments
     check_required_args(args) # Argument sanity check
@@ -299,8 +298,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
-        s = 'best_prec1'
-        best_prec1 = checkpoint[s] if s in checkpoint \
+        best_prec1 = checkpoint[prec1_key] if prec1_key in checkpoint \
             else _model_loop(args, 'val', val_loader, model, None, start_epoch-1, args.adv_train, writer=None)[0]
 
     # Timestamp for training start time
@@ -319,7 +317,6 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'schedule':(schedule and schedule.state_dict()),
             'epoch': epoch+1,
             'amp': amp.state_dict() if args.mixed_precision else None,
-            'best_prec1': None,
         }
 
 
@@ -349,7 +346,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
             our_prec1 = adv_prec1 if args.adv_train else prec1
             is_best = our_prec1 > best_prec1
             best_prec1 = max(our_prec1, best_prec1)
-            sd_info['best_prec1'] = best_prec1
+            sd_info[prec1_key] = our_prec1
 
             # log every checkpoint
             log_info = {
@@ -367,8 +364,6 @@ def train_model(args, model, loaders, *, checkpoint=None,
             if store: store[consts.LOGS_TABLE].append_row(log_info)
             # If we are at a saving epoch (or the last epoch), save a checkpoint
             if should_save_ckpt or last_epoch: save_checkpoint(ckpt_at_epoch(epoch))
-            # If  store exists and this is the last epoch, save a checkpoint
-            if last_epoch and store: store[consts.CKPTS_TABLE].append_row(sd_info)
 
             # Update the latest and best checkpoints (overrides old one)
             save_checkpoint(consts.CKPT_NAME_LATEST)
