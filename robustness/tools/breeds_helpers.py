@@ -11,14 +11,15 @@ from ..datasets import DATASETS
 REQUIRED_FILES = ['dataset_class_info.json',
                   'class_hierarchy.txt',
                   'node_names.txt']
-IMAGENET_FILE_PATH = "https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified"
+BREEDS_URL = "https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified"
 
-def setup_breeds(info_dir, url=IMAGENET_FILE_PATH):
+def setup_breeds(info_dir, url=BREEDS_URL):
     print(f"Downloading files from {url} to {info_dir}")
     if not os.path.exists(info_dir):
         os.makedirs(info_dir)
     for f in REQUIRED_FILES:
-        urllib.request.urlretrieve(url + f"/{f}", info_dir + f"/{f}")
+        urllib.request.urlretrieve(f"{url}/{f}",
+                                   os.path.join(info_dir, f))
 
 class ClassHierarchy():
     '''
@@ -33,20 +34,20 @@ class ClassHierarchy():
         """
 
         for f in REQUIRED_FILES:
-            if not os.path.exists(f'{info_dir}/{f}'):
+            if not os.path.exists(os.path.join(info_dir, f)):
                 raise Exception(f"Missing files: `info_dir` does not "
                                  "contain required file {f}")
         
-        # Details about dataset class (sleaves) names, IDS
-        with open(f'{info_dir}/dataset_class_info.json', 'r') as f:
+        # Details about dataset class names (leaves), IDS
+        with open(os.path.join(info_dir, "dataset_class_info.json")) as f:
             class_info = json.load(f)
 
         # Hierarchy represented as edges between parent & child nodes.
-        with open((f'{info_dir}/class_hierarchy.txt')) as f:
+        with open(os.path.join(info_dir, "class_hierarchy.txt")) as f:
             edges = [l.strip().split() for l in f.readlines()]
 
         # Information (names, IDs) for intermediate nodes in hierarchy.
-        with open((f'{info_dir}/node_names.txt')) as f:
+        with open(os.path.join(info_dir, "node_names.txt")) as f:
             mapping = [l.strip().split('\t') for l in f.readlines()]
 
 
@@ -60,7 +61,7 @@ class ClassHierarchy():
         self.HIER_NODE_NAME = {w[0]: w[1] for w in mapping}
         self.graph = self._make_parent_graph(self.LEAF_IDS, edges)
 
-        # Top-down clustering the hierarchy
+        # Arrange nodes in levels (top-down)
         self.node_to_level = self._make_level_dict(self.graph, root=root_wnid)
         self.level_to_nodes = {}
         for k, v in self.node_to_level.items():
@@ -151,11 +152,11 @@ class ClassHierarchy():
             curr = todo
             todo = []
             for w in curr:
-                for p in self.graph.successors(w):
-                    if p in self.LEAF_IDS:
-                        leaves.add(p)
+                for c in self.graph.successors(w):
+                    if c in self.LEAF_IDS:
+                        leaves.add(c)
                     else:
-                        todo.append(p)
+                        todo.append(c)
             todo = set(todo)
 
         # If the node itself is an ImageNet node
@@ -177,7 +178,7 @@ class ClassHierarchy():
         about a given set of nodes.
 
         Args:
-            nodes (list) : List of WordNet IDs of relevant nodes
+            nodes (list) : List of WordNet IDs for relevant nodes
         """    
 
         for n in nodes:
@@ -189,13 +190,13 @@ class ClassHierarchy():
             print_str += f" ({len(self.leaves_reachable(n))})"
             print(print_str)
 
-    def traverse(self, nodes, direction='down', depth=20):
+    def traverse(self, nodes, direction='down', depth=100):
         """
-        Find all nodes accessible from a set of nodes.
+        Find all nodes accessible from a set of given nodes.
 
         Args:
-            nodes (list) : List of WordNet IDs of relevant nodes
-            direction ("up"/"down"): Allowed traversal directions
+            nodes (list) : List of WordNet IDs for relevant nodes
+            direction ("up"/"down"): Traversal direction
             depth (int): Maximum depth to traverse (from nodes)
 
         Returns:
@@ -274,8 +275,7 @@ class BreedsDatasetGenerator():
         # Map each descendant to its ImageNet subclasses
         desc_map = {}
         for d in desc:
-            dcurr = sorted(list(self.hierarchy.leaves_reachable(d)))
-            desc_map[d] = dcurr
+            desc_map[d] = sorted(list(self.hierarchy.leaves_reachable(d)))
 
         # Map sorted by nodes that have the maximum number of children
         desc_sorted = sorted(desc_map.items(), key=lambda x: -len(x[1]))
