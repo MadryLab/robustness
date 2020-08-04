@@ -72,21 +72,30 @@ class DataSet(object):
                 transforms to apply to the validation images from the
                 dataset
         """
-        required_args = ['num_classes', 'mean', 'std', 'custom_class',
-            'label_mapping', 'transform_train', 'transform_test']
-        assert set(kwargs.keys()) == set(required_args), "Missing required args, only saw %s" % kwargs.keys()
+        required_args = ['num_classes', 'mean', 'std', 
+                         'transform_train', 'transform_test']
+        optional_args = ['custom_class', 'label_mapping', 'custom_class_args']
+
+        missing_args = set(required_args) - set(kwargs.keys())
+        if len(missing_args) > 0:
+            raise ValueError("Missing required args %s" % missing_args)
+
+        extra_args = set(kwargs.keys()) - set(required_args + optional_args)
+        if len(extra_args) > 0:
+            raise ValueError("Got unrecognized args %s" % extra_args)
+        final_kwargs = {k: kwargs.get(k, None) for k in required_args + optional_args} 
+
         self.ds_name = ds_name
         self.data_path = data_path
-        self.__dict__.update(kwargs)
+        self.__dict__.update(final_kwargs)
     
     def override_args(self, default_args, new_args):
         '''
         Convenience method for overriding arguments. (Internal)
         '''
         kwargs = {k: v for (k, v) in new_args.items() if v is not None}
-        extra_args = set(kwargs.keys()) - set(default_args.keys()) 
-        if len(extra_args) > 0: raise ValueError(f"Invalid arguments: {extra_args}")
         for k in kwargs:
+            if not (k in default_args): continue
             req_type = type(default_args[k])
             no_nones = (default_args[k] is not None) and (kwargs[k] is not None)
             if no_nones and (not isinstance(kwargs[k], req_type)):
@@ -164,7 +173,8 @@ class DataSet(object):
                                     only_val=only_val,
                                     seed=subset_seed,
                                     shuffle_train=shuffle_train,
-                                    shuffle_val=shuffle_val)
+                                    shuffle_val=shuffle_val,
+                                    custom_class_args=self.custom_class_args)
 
 class ImageNet(DataSet):
     '''
