@@ -11,6 +11,7 @@ Submodules
    robustness.tools.helpers
    robustness.tools.label_maps
    robustness.tools.vis_tools
+   robustness.tools.breeds_helpers
 
 Module contents
 ---------------
