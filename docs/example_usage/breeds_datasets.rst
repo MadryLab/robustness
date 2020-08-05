@@ -3,8 +3,9 @@ Creating BREEDS subpopulation shift benchmarks
 
 In this document, we will discuss how to create BREEDS datasets [STM20]_.
 Given any existing dataset that comes with a class hierarchy (e.g. ImageNet, 
-OpenImages), BREEDS allows you to make a derivative classification task that 
-can be used to measure robustness to subpopulation shift. To do this, we:
+OpenImages), the BREEDS methodology allows you to make a derivative
+classification task that can be used to measure robustness to subpopulation
+shift. To do this, we:
 
 1. Group together semantically-simlar classes ("breeds") in the dataset 
    into superclasses.
@@ -12,22 +13,24 @@ can be used to measure robustness to subpopulation shift. To do this, we:
    the twist that the "breeds" used in the training set from each superclasses 
    are disjoint from the "breeds" used in the test set. 
 
-As a primitive example, one could take ImageNet (which contains many cat and 
-dog breed classes), and use the BREEDS methodology to come up with a derivative 
-"cats vs dogs" task, where the training set would contain one set of breeds 
-(e.g. Egyptian cat, Tabby Cat vs Labrador, Golden Retriever) and the test set 
-would contain another set (e.g. Persian cat, alley cat vs Mastiff, Poodle). Here,
-is a (simplified) pictorial illustration of the BREEDS approach:
+As a primitive example, one could take ImageNet (which contains many classes
+corresponding to cat and dog breeds), and use the BREEDS methodology to come up
+with a derivative "cats vs. dogs" task, where the training set would contain one
+set of breeds (e.g., Egyptian cat and Tabby Cat vs. Labrador and Golden
+Retriever) and the test set would contain another set (e.g. Persian cat and
+alley cat vs Mastiff and Poodle). Here is a pictorial illustration of the BREEDS
+approach:
 
 .. image:: Figures/breeds_pipeline.png
   :width: 600
   :align: center
   :alt: Illustration of the BREEDS dataset creation pipeline.
 
-BREEDS allows you to create subpopulation shift benchmarks of varying difficulty
-automatically, without having to manually group or split up classes, and can be 
-applied to any dataset which has a class hierarchy. In this walkthrough, we will 
-use ImageNet and the corresponding class hierarchy from [STM20]_.
+This methodology allows you to create subpopulation shift benchmarks of varying
+difficulty automatically, without having to manually group or split up classes,
+and can be applied to any dataset which has a class hierarchy. In this
+walkthrough, we will use ImageNet and the corresponding class hierarchy from
+[STM20]_.
 
 .. raw:: html
 
@@ -40,7 +43,7 @@ Requirements/Setup
 ''''''''''''''''''
 To create BREEDS datasets using ImageNet, we need to create a: 
 
-- ``data_dir`` which contains the dataset  
+- ``data_dir`` which contains the ImageNet dataset  
   in PyTorch-readable format.
 - ``info_dir`` which contains the following information (files) about 
   the class hierarchy:
@@ -52,14 +55,17 @@ To create BREEDS datasets using ImageNet, we need to create a:
   - ``node_names.txt``: Each line contains the ID of a node followed by
     it's name (tab separated).
 
-For ImageNet, you can manually download the relevant files for the class hierarchy 
-from `here <https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified>`_ and move them to ``info_dir``. Alternatively, you can do it automatically
-using by specifying an empty ``info_dir`` to 
+For convenience, we provide the relevant files for the (modified) class
+hierarchy `here
+<https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified>`_.
+You can manually download them and move them to ``info_dir`` or do it
+automatically by specifying an empty ``info_dir`` to
 :meth:`~robustness.tools.breeds_helpers.BreedsDatasetGenerator.get_superclasses`:
 
 .. code-block:: python
 
    from robustness.tools.breeds_helpers import setup_breeds
+
    setup_breeds(info_dir)
 
 
@@ -75,6 +81,7 @@ step):
 
    from robustness.tools.breeds_helpers import ClassHierarchy
    import numpy as np
+
    hier = ClassHierarchy(info_dir)
    print(f"# Levels in hierarchy: {np.max(list(hier.level_to_nodes.keys()))}")
    print(f"# Nodes/level:",
@@ -151,6 +158,7 @@ to define the superclasses.
 .. code-block:: python
 
   from robustness.tools.breeds_helpers import BreedsDatasetGenerator
+
   DG = BreedsDatasetGenerator(info_dir)
 
 Specifically, we will use  
@@ -166,7 +174,7 @@ This function takes in the following arguments (see :meth:`this docstring
 - :samp:`split`: If ``None``, subclasses of a superclass are returned 
   as is, without partitioning them into the source and target domains. 
   Else, can be ``rand/good/bad`` depending on whether the subclass split should be
-  random or less/more adversarially chosen [STM20]_.
+  random or less/more adversarially chosen (see paper for details).
 - :samp:`ancestor`: If a node ID is specified, superclasses are chosen from 
   subtree of class hierarchy rooted at this node. Else, if None, :samp:`ancestor`
   is set to be the root node.
@@ -188,11 +196,11 @@ This method returns:
 
 - :samp:`superclasses` is a list containing the IDs of all the
   superclasses.
-- :samp:`subclass_tuple` is a tuple of subclass ranges for
+- :samp:`subclass_split` is a tuple of subclass ranges for
   the source and target domains. For instance,
-  :samp:`subclass_tuple[0]` is a list, which for each superclass,
+  :samp:`subclass_split[0]` is a list, which for each superclass,
   contains a list of subclasses present in the source domain.
-  If ``split=None``, subclass_tuple[1] is empty and can be
+  If ``split=None``, subclass_split[1] is empty and can be
   ignored.
 - :samp:`label_map` is a dictionary mapping a superclass
   number (label) to name. 
@@ -233,7 +241,7 @@ and their corresponding loaders:
   loaders_target = dataset_source.make_loaders(num_workers, batch_size)
   train_loader_target, val_loader_target = loaders_target
 
-You're all set! You can then use this :samp:`custom_dataset` and loaders
+You're all set! You can then use this dataset and loaders
 just as you would any other existing/custom dataset in the robustness 
 library. For instance, you can visualize validation set samples from
 both domains and their labels using:
@@ -241,6 +249,7 @@ both domains and their labels using:
 .. code-block:: python
 
   from robustness.tools.vis_tools import show_image_row
+
   for domain, loader in zip(["Source", "Target"],
                             [val_loader_source, val_loader_target]):
       im, lab = next(iter(loader))
