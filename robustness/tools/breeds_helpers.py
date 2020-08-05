@@ -282,12 +282,13 @@ class BreedsDatasetGenerator():
 
         # If not balanced, we will pick as many subclasses as possible
         # from this superclass (ignoring Nsubclasses)
+        assert Nsubclasses >= 2
         if not balanced:
             S = sum([len(d) for d in desc_map.values()])
             assert S >= Nsubclasses
             Nsubclasses = S
             if Nsubclasses % 2 != 0:
-                Nsubclasses = max(Nsubclasses - 1, 2)
+                Nsubclasses -= 1
 
         # Split superclasses into two disjoint sets
         assert Nsubclasses % 2 == 0
@@ -309,7 +310,7 @@ class BreedsDatasetGenerator():
             split, spare = ([], []), []
             
             for k, v in desc_sorted:
-                l = [len(s) + 0 for s in split]
+                l = [len(s) for s in split]
                 if split_type == "bad":            
                     if l[0] <= l[1] and l[0] < Nh:
                         if len(v) > Nh - l[0]: spare.extend(v[Nh-l[0]:])
