@@ -74,24 +74,34 @@ def get_image_annotations_mode(class_names, data_dir, mode="train"):
     return img_to_label
 
 
-def make_dataset(dir, mode, sample_info, class_to_idx, extensions):
+def make_dataset(dir, mode, sample_info, 
+                 class_to_idx, class_to_idx_comp, extensions):
     
     images = []
+    allowed_labels = set(class_to_idx.keys())
+    Nclasses = len(set(class_to_idx.values()))
     
     for k, v in sample_info.items():
         
         img_path = os.path.join(dir, "images", mode, k + ".jpg")
         
-        pos_labels = [l for l in v.keys() if v[l]['conf'][0] == '1']
-        neg_labels = [l for l in v.keys() if v[l]['conf'][0] == '0']
-        label = [0] * len(class_to_idx)
-        for p in pos_labels:
-            label[class_to_idx[p]] = 1
-        for n in neg_labels:
-            label[class_to_idx[n]] = -1
-            
-        item = (img_path, label)
-        images.append(item)
+        pos_labels = set([l for l in v.keys() if v[l]['conf'][0] == '1'])
+        neg_labels = set([l for l in v.keys() if v[l]['conf'][0] == '0'])
+
+        pos_labels = pos_labels.intersection(allowed_labels)
+        neg_labels = neg_labels.intersection(allowed_labels)
+        if Nclasses == 601 or len(pos_labels) != 0:
+            label = [0] * Nclasses
+            all_labels = [0] * 601
+            for p in pos_labels:
+                label[class_to_idx[p]] = 1
+                all_labels[class_to_idx_comp[p]] = 1
+            for n in neg_labels:
+                if label[class_to_idx[n]] == 0:
+                    label[class_to_idx[n]] = -1
+                all_labels[class_to_idx_comp[n]] = -1
+            item = (img_path, label, all_labels)
+            images.append(item)
         
     return images
 
@@ -118,6 +128,9 @@ class OIDatasetFolder(data.Dataset):
                  target_transform=target_transform_oi, label_mapping=None,
                  download=False):
         classes, class_to_idx, code_to_class = self._find_classes(root)
+        class_to_idx_comp = {k: v for k, v in class_to_idx.items()}
+        if label_mapping is not None:
+            classes, class_to_idx = label_mapping(classes, class_to_idx)
         
         mode = "train" if train else "test"
         sample_info = get_image_annotations_mode(code_to_class,
@@ -125,7 +138,9 @@ class OIDatasetFolder(data.Dataset):
                                                  data_dir=root)
     
     
-        samples = make_dataset(root, mode, sample_info, class_to_idx, extensions)
+        samples = make_dataset(root, mode, sample_info, 
+                                class_to_idx, class_to_idx_comp,
+                                extensions)
         if len(samples) == 0:
             raise(RuntimeError("Found 0 files in subfolders of: " + root + "\n"
                                "Supported extensions are: " + ",".join(extensions)))
@@ -138,6 +153,7 @@ class OIDatasetFolder(data.Dataset):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+        self.all_targets = [s[2] for s in samples]
 
         self.transform = transform
         self.target_transform = target_transform
@@ -158,14 +174,15 @@ class OIDatasetFolder(data.Dataset):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
-        path, target = self.samples[index]
+        path, target, comp_target = self.samples[index]
         sample = self.loader(path)
         if self.transform is not None:
             sample = self.transform(sample)
         if self.target_transform is not None:
             target = self.target_transform(target)
-
-        return sample, target
+        if self.target_transform is not None:
+            comp_target = self.target_transform(comp_target)
+        return sample, target, comp_target
 
     def __len__(self):
         return len(self.samples)

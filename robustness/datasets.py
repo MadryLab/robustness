@@ -458,15 +458,22 @@ class OpenImages(DataSet):
     dataset for large-scale multi-label and multi-class image classification.
     Available from https://storage.googleapis.com/openimages/web/index.html. 
     """
-    def __init__(self, data_path, **kwargs):
+    def __init__(self, data_path, custom_grouping=None, **kwargs):
         """
         """
+        if custom_grouping is None:
+            num_classes = 601
+            label_mapping = None 
+        else:
+            num_classes = len(custom_grouping)
+            label_mapping = get_label_mapping("custom_imagenet", custom_grouping)
+
         ds_kwargs = {
-            'num_classes': 601,
+            'num_classes': num_classes,
             'mean': ch.tensor([0.4859, 0.4131, 0.3083]),
             'std': ch.tensor([0.2919, 0.2507, 0.2273]),
             'custom_class': openimgs_helpers.OIDatasetFolder,
-            'label_mapping': None, 
+            'label_mapping': label_mapping, 
             'transform_train': da.TRAIN_TRANSFORMS_IMAGENET,
             'transform_test': da.TEST_TRANSFORMS_IMAGENET
         }

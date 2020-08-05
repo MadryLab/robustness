@@ -19,6 +19,8 @@ upcoming code releases. A few projects using the library include:
   [EIS+19]_ 
 - `Code <https://github.com/MadryLab/robustness_applications>`_ for
   "Image Synthesis with a Single (Robust) Classifier" [STE+19]_
+- `Code <https://github.com/MadryLab/BREEDS-Benchmarks>`_ for
+  "BREEDS: Benchmarks for Subpopulation Shift" [STM20]_
 
 We demonstrate how to use the library in a set of walkthroughs and our API
 reference. Functionality provided by the library includes:
@@ -134,6 +136,7 @@ Walkthroughs
    example_usage/training_lib_part_1
    example_usage/training_lib_part_2
    example_usage/custom_imagenet
+   example_usage/breeds_datasets
    example_usage/changelog
 
 API Reference
@@ -156,3 +159,5 @@ Contributors
 .. [EIS+19] Engstrom L., Ilyas A., Santurkar S., Tsipras D., Tran B., Madry A. (2019). Learning Perceptually-Aligned Representations via Adversarial Robustness. arXiv, arXiv:1906.00945 
 
 .. [STE+19] Santurkar S., Tsipras D., Tran B., Ilyas A., Engstrom L., Madry A. (2019). Image Synthesis with a Single (Robust) Classifier. arXiv, arXiv:1906.09453
+
+.. [STM20] Santurkar S., Tsipras D., Madry A. (2020). : BREEDS: Benchmarks for Subpopulation Shift. 
