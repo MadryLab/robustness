@@ -15,6 +15,9 @@ upcoming code releases. A few projects using the library include:
   "Image Synthesis with a Single (Robust) Classifier" <https://github.com/MadryLab/robustness_applications>`_ (https://arxiv.org/abs/1906.09453)
 - `Code for
   "Do Adversarially Robust ImageNet Models Transfer Better?" <https://github.com/microsoft/robust-models-transfer>`_ (https://arxiv.org/abs/2007.08489)
+- `Code for
+  "BREEDS: Benchmarks for Subpopulation Shift"
+  <https://github.com/MadryLab/BREEDS-Benchmarks>`_ (https://arxiv.org/abs/2008.04859)
 
 We
 demonstrate how to use the library in a set of walkthroughs and our API
