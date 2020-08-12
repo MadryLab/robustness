@@ -11,14 +11,14 @@ from ..datasets import DATASETS
 REQUIRED_FILES = ['dataset_class_info.json',
                   'class_hierarchy.txt',
                   'node_names.txt']
-BREEDS_URL = "https://github.com/MadryLab/BREEDS-Benchmarks/tree/master/imagenet_class_hierarchy/modified"
+BREEDS_URL = "https://github.com/MadryLab/BREEDS-Benchmarks/blob/master/imagenet_class_hierarchy/modified/" 
 
 def setup_breeds(info_dir, url=BREEDS_URL):
     print(f"Downloading files from {url} to {info_dir}")
     if not os.path.exists(info_dir):
         os.makedirs(info_dir)
     for f in REQUIRED_FILES:
-        urllib.request.urlretrieve(f"{url}/{f}",
+        urllib.request.urlretrieve(f"{url}/{f}?raw=true",
                                    os.path.join(info_dir, f))
 
 class ClassHierarchy():
