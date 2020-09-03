@@ -89,11 +89,10 @@ class DataSet(object):
         self.data_path = data_path
         self.__dict__.update(final_kwargs)
     
-    def override_args(self, default_args, new_args):
+    def override_args(self, default_args, kwargs):
         '''
         Convenience method for overriding arguments. (Internal)
         '''
-        kwargs = {k: v for (k, v) in new_args.items() if v is not None}
         for k in kwargs:
             if not (k in default_args): continue
             req_type = type(default_args[k])
