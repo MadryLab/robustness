@@ -122,7 +122,8 @@ class DataSet(object):
 
     def make_loaders(self, workers, batch_size, data_aug=True, subset=None, 
                     subset_start=0, subset_type='rand', val_batch_size=None,
-                    only_val=False, shuffle_train=True, shuffle_val=True, subset_seed=None):
+                    only_val=False, shuffle_train=True, shuffle_val=True, 
+                    subset_seed=None, with_index=False):
         '''
         Args:
             workers (int) : number of workers for data fetching (*required*).
@@ -137,7 +138,7 @@ class DataSet(object):
                 not `None`; "rand" selects the subset randomly, "first"
                 uses the first `subset` images of the training data, and
                 "last" uses the last `subset` images of the training data.
-            seed (int) : only used if `subset == "rand"`; allows one to fix
+            subset_seed (int) : only used if `subset == "rand"`; allows one to fix
                 the random seed used to generate the subset (defaults to 1).
             val_batch_size (None|int) : if not `None`, specifies a
                 different batch size for the validation set loader.
@@ -147,6 +148,9 @@ class DataSet(object):
                 in the returned DataLoader.
             shuffle_val (bool) : Whether or not to shuffle the test data in the
                 returned DataLoader.
+            with_index (bool) : If true, the loader will yield (x, y, i) pairs
+                instead of (x, y) pairs, where i is the index of the image in 
+                the dataset. 
 
         Returns:
             A training loader and validation loader according to the
@@ -174,7 +178,8 @@ class DataSet(object):
                                     seed=subset_seed,
                                     shuffle_train=shuffle_train,
                                     shuffle_val=shuffle_val,
-                                    custom_class_args=self.custom_class_args)
+                                    custom_class_args=self.custom_class_args,
+                                    with_index=with_index)
 
 class ImageNet(DataSet):
     '''

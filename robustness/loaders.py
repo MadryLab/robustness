@@ -24,7 +24,7 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
                 custom_class=None, dataset="", label_mapping=None, subset=None,
                 subset_type='rand', subset_start=0, val_batch_size=None,
                 only_val=False, shuffle_train=True, shuffle_val=True, seed=1,
-                custom_class_args=None):
+                custom_class_args=None, with_index=False):
     '''
     **INTERNAL FUNCTION**
 
@@ -55,10 +55,12 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
 
         if not only_val:
             train_set = folder.ImageFolder(root=train_path, transform=transform_train,
-                                           label_mapping=label_mapping)
+                            label_mapping=label_mapping, with_index=with_index)
         test_set = folder.ImageFolder(root=test_path, transform=transform_test,
-                                      label_mapping=label_mapping)
+                            label_mapping=label_mapping, with_index=with_index)
     else:
+        if with_index: raise ValueError("with_index=True not yet supported "
+            "for archive-based datasets. Try subclassing the dataset class instead.")
         if custom_class_args is None: custom_class_args = {}
         if not only_val:
             train_set = custom_class(root=data_path, train=True, download=True, 

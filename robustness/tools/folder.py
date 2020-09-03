@@ -82,7 +82,7 @@ class DatasetFolder(data.Dataset):
     """
 
     def __init__(self, root, loader, extensions, transform=None,
-                 target_transform=None, label_mapping=None):
+            target_transform=None, label_mapping=None, with_index=False):
         classes, class_to_idx = self._find_classes(root)
         if label_mapping is not None:
             classes, class_to_idx = label_mapping(classes, class_to_idx)
@@ -100,6 +100,7 @@ class DatasetFolder(data.Dataset):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+        self.with_index = with_index
 
         self.transform = transform
         self.target_transform = target_transform
@@ -140,6 +141,9 @@ class DatasetFolder(data.Dataset):
             sample = self.transform(sample)
         if self.target_transform is not None:
             target = self.target_transform(target)
+
+        if self.with_index:
+            return sample, target, index
 
         return sample, target
 
