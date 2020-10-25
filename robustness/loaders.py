@@ -18,13 +18,14 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Subset
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from . import imagenet_models as models
 
 def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
                 custom_class=None, dataset="", label_mapping=None, subset=None,
                 subset_type='rand', subset_start=0, val_batch_size=None,
                 only_val=False, shuffle_train=True, shuffle_val=True, seed=1,
-                custom_class_args=None):
+                custom_class_args=None, distributed_args=None):
     '''
     **INTERNAL FUNCTION**
 
@@ -85,12 +86,16 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
 
         train_set = Subset(train_set, subset)
 
+    test_sampler = distributed_args and DistributedSampler(test_set, *distributed_args)
+    train_sampler = distributed_args and DistributedSampler(train_set, *distributed_args)
     if not only_val:
         train_loader = DataLoader(train_set, batch_size=batch_size, 
-            shuffle=shuffle_train, num_workers=workers, pin_memory=True)
+            shuffle=((train_sampler is None) and shuffle_train), 
+            num_workers=workers, pin_memory=True, sampler=train_sampler)
 
     test_loader = DataLoader(test_set, batch_size=val_batch_size, 
-            shuffle=shuffle_val, num_workers=workers, pin_memory=True)
+            shuffle=((test_sampler is None) and shuffle_val), 
+            num_workers=workers, pin_memory=True, sampler=test_sampler)
 
     if only_val:
         return None, test_loader

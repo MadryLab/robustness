@@ -6,12 +6,16 @@ from torchvision.utils import make_grid
 from cox.utils import Parameters
 
 from .tools import helpers
-from .tools.helpers import AverageMeter, ckpt_at_epoch, has_attr
+from .tools.helpers import AverageMeter, ckpt_at_epoch, has_attr, DistributedLoader
 from .tools import constants as consts
 import dill 
 import os
 import time
 import warnings
+
+from torch.nn.parallel import DistributedDataParallel as DDP
+import multiprocessing as mp
+from torch import distributed, multiprocessing
 
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
     from tqdm import tqdm_notebook as tqdm
@@ -55,7 +59,6 @@ def check_required_args(args, eval_only=False):
     if has_custom_train and is_adv and not has_custom_adv:
         raise ValueError("Cannot use custom train loss \
             without a custom adversarial loss (see docs)")
-
 
 def make_optimizer_and_schedule(args, model, checkpoint, params):
     """
@@ -174,8 +177,22 @@ def eval_model(args, model, loader, store):
     if store: store[consts.LOGS_TABLE].append_row(log_info)
     return log_info
 
-def train_model(args, model, loaders, *, checkpoint=None, 
-            store=None, update_params=None, disable_no_grad=False):
+def handle_logging(store, request):
+    rq_type, rq_data = request['request_type'], request['data']
+    if rq_type == 'cox_store':
+        store[rq_data['table_name']].append_row(rq_data['row_data'])
+    elif rq_type == 'tensorboard':
+        assert rq_data['dtype'] in {'image', 'scalar'}
+        func = store.tensorboard.add_image if rq_data['dtype'] == 'image' \
+                    else store.tensorboard.add_scalar
+        func(*rq_data['args'])
+    elif rq_type == 'sentinel':
+        return rq_data['rank']
+
+    return None
+
+def train_model(args, model, loaders, *, checkpoint=None, store=None, 
+                update_params=None, disable_no_grad=False, parallel='ddp'):
     """
     Main function for training a model. 
 
@@ -272,10 +289,9 @@ def train_model(args, model, loaders, *, checkpoint=None,
             learning)
         disable_no_grad (bool) : if True, then even model evaluation will be
             run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
+        gpus (list|'all') : 
     """
     # Logging setup
-    writer = store.tensorboard if store else None
-    prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
     if store is not None: 
         store.add_table(consts.LOGS_TABLE, consts.LOGS_SCHEMA)
     
@@ -287,13 +303,56 @@ def train_model(args, model, loaders, *, checkpoint=None,
         eps_periods = args.custom_eps_multiplier
         args.custom_eps_multiplier = lambda t: np.interp([t], *zip(*eps_periods))[0]
 
+    logging_q = multiprocessing.Queue()
+    if parallel == 'ddp':
+        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_PORT'] = '4040'
+        
+        world_size = ch.cuda.device_count()
+        assert isinstance(loaders, DistributedLoader), """
+            For 'ddp' mode, loaders must be provided as the 
+            dictionary of arguments you want to pass to make_loaders"""
+        
+        save_dir = args.out_dir if not store else store.path
+        mp_args = (args, model, world_size, dill.dumps(loaders), update_params, 
+                   disable_no_grad, save_dir, logging_q, checkpoint)
+        
+        jobs = []
+        for i in range(world_size):
+            p = multiprocessing.Process(target=train_single_gpu, args=(i,) + mp_args)
+            p.start()
+            jobs.append(p)
+
+        gpus_done = set()
+        while True:
+            next_req = logging_q.get()
+            gpu_done = handle_logging(store, next_req)
+            if gpu_done is not None: gpus_done.add(gpu_done)
+            if len(set(range(world_size)) - gpus_done) == 0:
+                break
+
+def train_single_gpu(gpu, args, model, world_size, loaders, update_params, 
+                     disable_no_grad, save_dir, logging_q, checkpoint):
+    # Make sure model is not in DataParallel
+    assert not hasattr(model, "module"), "model is wrapped in DataParallel."
+    writer_q = logging_q if gpu == 0 else None
+    prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
+
+    # Set up DistributedDataParallel
+    distributed.init_process_group(backend='nccl', init_method='env://',
+                                   world_size=world_size, rank=gpu)
+    ch.cuda.set_device(gpu)
+    model.cuda(gpu)
+
+    model = DDP(model, device_ids=[gpu])
+
     # Initial setup
-    train_loader, val_loader = loaders
+    loaders = dill.loads(loaders)
+    train_loader, val_loader = loaders.loaders(world_size, gpu)
     opt, schedule = make_optimizer_and_schedule(args, model, checkpoint, update_params)
 
     # Put the model into parallel mode
-    assert not hasattr(model, "module"), "model is already in DataParallel."
-    model = ch.nn.DataParallel(model).cuda()
+    # model = ch.nn.DataParallel(model).cuda()
 
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
@@ -303,11 +362,11 @@ def train_model(args, model, loaders, *, checkpoint=None,
 
     # Timestamp for training start time
     start_time = time.time()
-
     for epoch in range(start_epoch, args.epochs):
+        train_loader.sampler.set_epoch(epoch) # TEST
         # train for one epoch
         train_prec1, train_loss = _model_loop(args, 'train', train_loader, 
-                model, opt, epoch, args.adv_train, writer)
+            model, opt, epoch, args.adv_train, writer_q, use_tqdm=True)
         last_epoch = (epoch == (args.epochs - 1))
 
         # evaluate on validation set
@@ -319,10 +378,9 @@ def train_model(args, model, loaders, *, checkpoint=None,
             'amp': amp.state_dict() if args.mixed_precision else None,
         }
 
-
         def save_checkpoint(filename):
-            ckpt_save_path = os.path.join(args.out_dir if not store else \
-                                          store.path, filename)
+            if gpu != 0: return # Only save if you are the first worker
+            ckpt_save_path = os.path.join(save_dir, filename)
             ch.save(sd_info, ckpt_save_path, pickle_module=dill)
 
         save_its = args.save_ckpt_iters
@@ -334,7 +392,7 @@ def train_model(args, model, loaders, *, checkpoint=None,
             ctx = ch.enable_grad() if disable_no_grad else ch.no_grad() 
             with ctx:
                 prec1, nat_loss = _model_loop(args, 'val', val_loader, model, 
-                        None, epoch, False, writer)
+                        None, epoch, False, writer_q)
 
             # loader, model, epoch, input_adv_exs
             should_adv_eval = args.adv_eval or args.adv_train
@@ -361,7 +419,11 @@ def train_model(args, model, loaders, *, checkpoint=None,
             }
 
             # Log info into the logs table
-            if store: store[consts.LOGS_TABLE].append_row(log_info)
+            if logging_q: 
+                #store[consts.LOGS_TABLE].append_row(log_info) TODO: delete this
+                logging_data = {'table_name': consts.LOGS_TABLE, 'row_data': log_info}
+                logging_q.put({'request_type': 'cox_store', 'data': logging_data})
+
             # If we are at a saving epoch (or the last epoch), save a checkpoint
             if should_save_ckpt or last_epoch: save_checkpoint(ckpt_at_epoch(epoch))
 
@@ -372,9 +434,10 @@ def train_model(args, model, loaders, *, checkpoint=None,
         if schedule: schedule.step()
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
 
+    logging_q.put({'request_type': 'sentinel', 'data': {'rank': gpu}})
     return model
 
-def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
+def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer_q, use_tqdm=True):
     """
     *Internal function* (refer to the train_model and eval_model functions for
     how to train and evaluate models).
@@ -391,7 +454,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
         opt (ch.optim.Optimizer) : optimizer to use (ignored for evaluation)
         epoch (int) : which epoch we are currently on
         adv (bool) : whether to evaluate adversarially (otherwise standard)
-        writer : tensorboardX writer (optional)
+        writer_q (multiprocessing.Queue) : tensorboardX writer queue (optional)
 
     Returns:
         The average top1 accuracy and the average loss across the epoch.
@@ -409,7 +472,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
     loop_msg = 'Train' if loop_type == 'train' else 'Val'
 
     # switch to train/eval mode depending
-    model = model.train() if is_train else model.eval()
+    model.train() if is_train else model.eval()
 
     # If adv training (or evaling), set eps and random_restarts appropriately
     if adv:
@@ -438,7 +501,8 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             'use_best': bool(args.use_best)
         }
 
-    iterator = tqdm(enumerate(loader), total=len(loader))
+    iterator = enumerate(loader)
+    if use_tqdm: iterator = tqdm(iterator, total=len(loader))
     for i, (inp, target) in iterator:
        # measure data loading time
         target = target.cuda(non_blocking=True)
@@ -484,12 +548,14 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             else:
                 loss.backward()
             opt.step()
-        elif adv and i == 0 and writer:
+        elif adv and i == 0 and writer_q:
             # add some examples to the tensorboard
             nat_grid = make_grid(inp[:15, ...])
             adv_grid = make_grid(final_inp[:15, ...])
-            writer.add_image('Nat input', nat_grid, epoch)
-            writer.add_image('Adv input', adv_grid, epoch)
+            writer_q.put({'request_type': 'tensorboard', 
+                'data': {'dtype': 'image', 'args': ['Nat input', nat_grid.cpu().numpy(), epoch]}})
+            writer_q.put({'request_type': 'tensorboard', 
+                'data': {'dtype': 'image', 'args': ['Adv input', adv_grid.cpu().numpy(), epoch]}})
 
         # ITERATOR
         desc = ('{2} Epoch:{0} | Loss {loss.avg:.4f} | '
@@ -501,16 +567,18 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
         if has_attr(args, 'iteration_hook'):
             args.iteration_hook(model, i, loop_type, inp, target)
 
-        iterator.set_description(desc)
-        iterator.refresh()
+        if use_tqdm:
+            iterator.set_description(desc)
+            iterator.refresh()
 
-    if writer is not None:
+    if writer_q is not None:
         prec_type = 'adv' if adv else 'nat'
         descs = ['loss', 'top1', 'top5']
-        vals = [losses, top1, top5]
+        vals = [losses.avg, top1.avg, top5.avg]
         for d, v in zip(descs, vals):
-            writer.add_scalar('_'.join([prec_type, loop_type, d]), v.avg,
-                              epoch)
+            plot_title =  '_'.join([prec_type, loop_type, d])
+            writer_q.put({'request_type': 'tensorboard', 
+                'data': {'dtype': 'scalar', 'args': [plot_title, v, epoch]}})
 
     return top1.avg, losses.avg
 

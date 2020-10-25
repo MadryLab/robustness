@@ -1,3 +1,15 @@
+DDP branch
+==========
+Branch for adding in support for ``DistributedDataParallel``. Currently supports
+standard training and is much faster than the master branch which uses
+``DataParallel``. There are many remaining TODOs though:
+
+- [ ] Automatically divide batch size by world size (currently batch size is per-gpu)
+- [ ] Change adversarial examples to use optimizers instead of
+  ``ch.autograd.grad``, since the latter is not supported in DDP
+- [ ] Write tests to ensure accuracy is preserved across common datasets
+- [ ] Figure out why there is a bit of a lag between epochs when DDP is used
+
 robustness package
 ==================
 Install via ``pip``: ``pip install robustness``

@@ -27,7 +27,7 @@ from .tools import openimgs_helpers
 from . import data_augmentation as da
 from . import loaders
 
-from .tools.helpers import get_label_mapping
+from .tools.helpers import get_label_mapping, DistributedLoader
 
 ###
 # Datasets: (all subclassed from dataset)
@@ -119,9 +119,21 @@ class DataSet(object):
 
         raise NotImplementedError
 
-    def make_loaders(self, workers, batch_size, data_aug=True, subset=None, 
+    def make_distributed_loaders(self, workers, batch_size, **kwargs):
+        '''
+        Swap-out alternative to make_loaders for training with DataDistributedParallel.
+        See the ``make_loaders`` function for information on arguments and defaults.
+        '''
+        try: self.make_loaders(workers, batch_size, **kwargs)
+        except: raise ValueError("Invalid arguments passed to DistributedLoader.")
+        kwargs['workers'] = workers
+        kwargs['batch_size'] = batch_size
+        return DistributedLoader(self, kwargs)
+
+    def make_loaders(self, workers, batch_size, *, data_aug=True, subset=None, 
                     subset_start=0, subset_type='rand', val_batch_size=None,
-                    only_val=False, shuffle_train=True, shuffle_val=True, subset_seed=None):
+                    only_val=False, shuffle_train=True, shuffle_val=True, 
+                    subset_seed=None, distributed_args=None):
         '''
         Args:
             workers (int) : number of workers for data fetching (*required*).
@@ -146,6 +158,9 @@ class DataSet(object):
                 in the returned DataLoader.
             shuffle_val (bool) : Whether or not to shuffle the test data in the
                 returned DataLoader.
+            distributed_args (tuple) : If not None, should be a tuple of the form
+                (world_size, rank) for making a DistributedSample. Forces the 
+                values of shuffle_train and shuffle_val to False.
 
         Returns:
             A training loader and validation loader according to the
@@ -173,7 +188,8 @@ class DataSet(object):
                                     seed=subset_seed,
                                     shuffle_train=shuffle_train,
                                     shuffle_val=shuffle_val,
-                                    custom_class_args=self.custom_class_args)
+                                    custom_class_args=self.custom_class_args,
+                                    distributed_args=distributed_args)
 
 class ImageNet(DataSet):
     '''

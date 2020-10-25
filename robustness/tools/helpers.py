@@ -100,6 +100,15 @@ class InputNormalize(ch.nn.Module):
         x_normalized = (x - self.new_mean)/self.new_std
         return x_normalized
 
+class DistributedLoader():
+    def __init__(self, dataset, args):
+        self.dataset = dataset
+        self.args = args
+    
+    def loaders(self, world_size, rank):
+        args = {**self.args, 'distributed_args': (world_size, rank)}
+        return self.dataset.make_loaders(**args)
+
 class DataPrefetcher():
     def __init__(self, loader, stop_after=None):
         self.loader = loader

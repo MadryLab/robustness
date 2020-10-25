@@ -7,6 +7,8 @@ from argparse import ArgumentParser
 import os
 import git
 import torch as ch
+from torch import multiprocessing as mp
+from torch import distributed
 
 import cox
 import cox.utils
@@ -16,7 +18,7 @@ try:
     from .model_utils import make_and_restore_model
     from .datasets import DATASETS
     from .train import train_model, eval_model
-    from .tools import constants, helpers
+    from .tools import constants, helpers, distributed_helpers
     from . import defaults, __version__
     from .defaults import check_and_fill_args
 except:
@@ -38,12 +40,12 @@ def main(args, store=None):
     data_path = os.path.expandvars(args.data)
     dataset = DATASETS[args.dataset](data_path)
 
-    train_loader, val_loader = dataset.make_loaders(args.workers,
+    loaders = dataset.make_distributed_loaders(args.workers,
                     args.batch_size, data_aug=bool(args.data_aug))
 
-    train_loader = helpers.DataPrefetcher(train_loader)
-    val_loader = helpers.DataPrefetcher(val_loader)
-    loaders = (train_loader, val_loader)
+    #train_loader = helpers.DataPrefetcher(train_loader)
+    #val_loader = helpers.DataPrefetcher(val_loader)
+    #loaders = (train_loader, val_loader)
 
     # MAKE MODEL
     model, checkpoint = make_and_restore_model(arch=args.arch,
@@ -107,6 +109,7 @@ def setup_store_with_metadata(args):
     return store
 
 if __name__ == "__main__":
+    mp.set_start_method('spawn')
     args = parser.parse_args()
     args = cox.utils.Parameters(args.__dict__)
 
