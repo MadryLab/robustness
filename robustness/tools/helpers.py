@@ -72,7 +72,7 @@ def accuracy(output, target, topk=(1,), exact=False):
         res = []
         res_exact = []
         for k in topk:
-            correct_k = correct[:k].view(-1).float()
+            correct_k = correct[:k].reshape(-1).float()
             ck_sum = correct_k.sum(0, keepdim=True)
             res.append(ck_sum.mul_(100.0 / batch_size))
             res_exact.append(correct_k)
