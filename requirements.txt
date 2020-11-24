@@ -11,3 +11,4 @@ scikit-learn
 seaborn
 cox
 matplotlib
+networkx
