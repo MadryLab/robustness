@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+robustness 1.2.post2 
+'''''''''''''''''''''
+- Add SqueezeNet architectures
+- (Preliminary) Torch 1.7 support
+- Support for specifying device_ids in DataParallel
+
 robustness 1.2
 '''''''''''''''
 - Biggest new features:
