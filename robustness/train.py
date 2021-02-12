@@ -82,10 +82,6 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     optimizer = SGD(param_list, args.lr, momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
-    if args.mixed_precision:
-        model.to('cuda')
-        model, optimizer = amp.initialize(model, optimizer, 'O1')
-
     # Make schedule
     schedule = None
     if args.custom_lr_multiplier == 'cyclic':
@@ -108,23 +104,7 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
 
     # Fast-forward the optimizer and the scheduler if resuming
     if checkpoint:
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        try:
-            schedule.load_state_dict(checkpoint['schedule'])
-        except:
-            steps_to_take = checkpoint['epoch']
-            print('Could not load schedule (was probably LambdaLR).'
-                  f' Stepping {steps_to_take} times instead...')
-            for i in range(steps_to_take):
-                schedule.step()
-        
-        if 'amp' in checkpoint and checkpoint['amp'] not in [None, 'N/A']:
-            amp.load_state_dict(checkpoint['amp'])
-
-        # TODO: see if there's a smarter way to do this
-        # TODO: see what's up with loading fp32 weights and then MP training
-        if args.mixed_precision:
-            model.load_state_dict(checkpoint['model'])
+        raise ValueError('Not supported in this fork')
 
     return optimizer, schedule
 
@@ -175,7 +155,8 @@ def eval_model(args, model, loader, store):
     return log_info
 
 def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
-            store=None, update_params=None, disable_no_grad=False):
+            store=None, update_params=None, disable_no_grad=False,
+            log_checkpoints=False):
     """
     Main function for training a model. 
 
@@ -291,11 +272,18 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
 
     # Initial setup
     train_loader, val_loader = loaders
-    opt, schedule = make_optimizer_and_schedule(args, model, checkpoint, update_params)
+    if args.mixed_precision:
+        assert args.opt_model_and_schedule
+
+    if not args.opt_model_and_schedule:
+        opt, schedule = make_optimizer_and_schedule(args, model, checkpoint,
+                                                    update_params)
+        assert not hasattr(model, "module"), "model is already in DataParallel."
+        model = ch.nn.DataParallel(model, device_ids=dp_device_ids).cuda()
+    else:
+        opt, model, schedule = args.opt_model_and_schedule
 
     # Put the model into parallel mode
-    assert not hasattr(model, "module"), "model is already in DataParallel."
-    model = ch.nn.DataParallel(model, device_ids=dp_device_ids).cuda()
 
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
@@ -321,11 +309,11 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
             'amp': amp.state_dict() if args.mixed_precision else None,
         }
 
-
         def save_checkpoint(filename):
-            ckpt_save_path = os.path.join(args.out_dir if not store else \
-                                          store.path, filename)
-            ch.save(sd_info, ckpt_save_path, pickle_module=dill)
+            if log_checkpoints:
+                ckpt_save_path = os.path.join(args.out_dir if not store else \
+                                            store.path, filename)
+                ch.save(sd_info, ckpt_save_path, pickle_module=dill)
 
         save_its = args.save_ckpt_iters
         should_save_ckpt = (epoch % save_its == 0) and (save_its > 0)
