@@ -131,6 +131,7 @@ def ResNet152(**kwargs):
 
 resnet50 = ResNet50
 resnet18 = ResNet18
+resnet34 = ResNet34
 resnet101 = ResNet101
 resnet152 = ResNet152
 resnet18wide = ResNet18Wide
