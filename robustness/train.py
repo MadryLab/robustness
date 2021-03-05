@@ -360,7 +360,7 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
             if is_best: save_checkpoint(consts.CKPT_NAME_BEST)
         else:
             log_info = {
-                'epoch':epoch,
+                'epoch':epoch + 1,
                 'time':time.time() - start_time
             }
 
