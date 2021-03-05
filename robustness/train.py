@@ -358,6 +358,11 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
             # Update the latest and best checkpoints (overrides old one)
             save_checkpoint(consts.CKPT_NAME_LATEST)
             if is_best: save_checkpoint(consts.CKPT_NAME_BEST)
+        else:
+            log_info = {
+                'epoch':epoch,
+                'time':time.time() - start_time
+            }
 
         if schedule: schedule.step()
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
