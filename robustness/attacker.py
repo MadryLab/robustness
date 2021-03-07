@@ -272,59 +272,8 @@ class AttackerModel(ch.nn.Module):
         super(AttackerModel, self).__init__()
         self.normalizer = helpers.InputNormalize(dataset.mean, dataset.std)
         self.model = model
-        self.attacker = Attacker(model, dataset)
 
-    def forward(self, inp, target=None, make_adv=False, with_latent=False,
-                fake_relu=False, no_relu=False, with_image=True, **attacker_kwargs):
-        """
-        Main function for running inference and generating adversarial
-        examples for a model.
-
-        Parameters:
-            inp (ch.tensor) : input to do inference on [N x input_shape] (e.g. NCHW)
-            target (ch.tensor) : ignored if `make_adv == False`. Otherwise,
-                labels for adversarial attack.
-            make_adv (bool) : whether to make an adversarial example for
-                the model. If true, returns a tuple of the form
-                :samp:`(model_prediction, adv_input)` where
-                :samp:`model_prediction` is a tensor with the *logits* from
-                the network.
-            with_latent (bool) : also return the second-last layer along
-                with the logits. Output becomes of the form
-                :samp:`((model_logits, model_layer), adv_input)` if
-                :samp:`make_adv==True`, otherwise :samp:`(model_logits, model_layer)`.
-            fake_relu (bool) : useful for activation maximization. If
-                :samp:`True`, replace the ReLUs in the last layer with
-                "fake ReLUs," which are ReLUs in the forwards pass but
-                identity in the backwards pass (otherwise, maximizing a
-                ReLU which is dead is impossible as there is no gradient).
-            no_relu (bool) : If :samp:`True`, return the latent output with
-                the (pre-ReLU) output of the second-last layer, instead of the
-                post-ReLU output. Requires :samp:`fake_relu=False`, and has no
-                visible effect without :samp:`with_latent=True`.
-            with_image (bool) : if :samp:`False`, only return the model output
-                (even if :samp:`make_adv == True`).
-
-        """
-        if make_adv:
-            assert target is not None
-            prev_training = bool(self.training)
-            self.eval()
-            adv = self.attacker(inp, target, **attacker_kwargs)
-            if prev_training:
-                self.train()
-
-            inp = adv
-
+    def forward(self, inp):
         normalized_inp = self.normalizer(inp)
-
-        if no_relu and (not with_latent):
-            print("WARNING: 'no_relu' has no visible effect if 'with_latent is False.")
-        if no_relu and fake_relu:
-            raise ValueError("Options 'no_relu' and 'fake_relu' are exclusive")
-
-        output = self.model(normalized_inp, with_latent=with_latent,
-                                fake_relu=fake_relu, no_relu=no_relu)
-        if with_image:
-            return (output, inp)
+        output = self.model(normalized_inp)
         return output

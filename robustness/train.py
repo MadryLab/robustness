@@ -437,8 +437,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
     for i, (inp, target) in iterator:
        # measure data loading time
         target = target.cuda(non_blocking=True)
-        output, final_inp = model(inp, target=target, make_adv=adv,
-                                  **attack_kwargs)
+        output = model(inp)
         loss = train_criterion(output, target)
 
         if len(loss.shape) > 0: loss = loss.mean()
@@ -479,12 +478,6 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
             else:
                 loss.backward()
             opt.step()
-        elif adv and i == 0 and writer:
-            # add some examples to the tensorboard
-            nat_grid = make_grid(inp[:15, ...])
-            adv_grid = make_grid(final_inp[:15, ...])
-            writer.add_image('Nat input', nat_grid, epoch)
-            writer.add_image('Adv input', adv_grid, epoch)
 
         # ITERATOR
         desc = ('{2} Epoch:{0} | Loss {loss.avg:.4f} | '

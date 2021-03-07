@@ -47,7 +47,7 @@ class DummyModel(nn.Module):
         super().__init__()
         self.model = model
 
-    def forward(self, x, *args, **kwargs):
+    def forward(self, x):
         return self.model(x)
 
 def make_and_restore_model(*_, arch, dataset, resume_path=None,
