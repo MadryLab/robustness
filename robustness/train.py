@@ -13,15 +13,14 @@ import os
 import time
 import warnings
 
+from torch.cuda.amp import GradScaler, autocast
+
+scaler = GradScaler()
+
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
     from tqdm import tqdm_notebook as tqdm
 else:
     from tqdm import tqdm as tqdm
-
-try:
-    from apex import amp
-except Exception as e:
-    warnings.warn('Could not import amp.')
 
 def check_required_args(args, eval_only=False):
     """
@@ -129,16 +128,15 @@ def eval_model(args, model, loader, store):
 
     assert not hasattr(model, "module"), "model is already in DataParallel."
     model = ch.nn.DataParallel(model)
-
-    prec1, nat_loss = _model_loop(args, 'val', loader, 
-                                        model, None, 0, False, writer)
+    prec1, nat_loss = _model_loop(args, 'val', loader, model, None, 0, False,
+                                  writer)
 
     adv_prec1, adv_loss = float('nan'), float('nan')
     if args.adv_eval: 
         args.eps = eval(str(args.eps)) if has_attr(args, 'eps') else None
         args.attack_lr = eval(str(args.attack_lr)) if has_attr(args, 'attack_lr') else None
-        adv_prec1, adv_loss = _model_loop(args, 'val', loader, 
-                                        model, None, 0, True, writer)
+        adv_prec1, adv_loss = _model_loop(args, 'val', loader, model, None, 0,
+                                          True, writer)
     log_info = {
         'epoch':0,
         'nat_prec1':prec1,
@@ -272,9 +270,6 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
 
     # Initial setup
     train_loader, val_loader = loaders
-    if args.mixed_precision:
-        assert args.opt_model_and_schedule
-
     if not args.opt_model_and_schedule:
         opt, schedule = make_optimizer_and_schedule(args, model, checkpoint,
                                                     update_params)
@@ -289,7 +284,8 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
     if checkpoint:
         start_epoch = checkpoint['epoch']
         best_prec1 = checkpoint[prec1_key] if prec1_key in checkpoint \
-            else _model_loop(args, 'val', val_loader, model, None, start_epoch-1, args.adv_train, writer=None)[0]
+            else _model_loop(args, 'val', val_loader, model, None,
+                            start_epoch-1, args.adv_train, writer)[0]
 
     # Timestamp for training start time
     start_time = time.time()
@@ -305,8 +301,7 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
             'model':model.state_dict(),
             'optimizer':opt.state_dict(),
             'schedule':(schedule and schedule.state_dict()),
-            'epoch': epoch+1,
-            'amp': amp.state_dict() if args.mixed_precision else None,
+            'epoch': epoch+1
         }
 
         def save_checkpoint(filename):
@@ -437,47 +432,45 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
     for i, (inp, target) in iterator:
        # measure data loading time
         target = target.cuda(non_blocking=True)
-        output = model(inp)
-        loss = train_criterion(output, target)
+        with autocast():
+            output = model(inp)
+            loss = train_criterion(output, target)
 
-        if len(loss.shape) > 0: loss = loss.mean()
+            if len(loss.shape) > 0: loss = loss.mean()
 
-        model_logits = output[0] if (type(output) is tuple) else output
+            model_logits = output[0] if (type(output) is tuple) else output
 
-        # measure accuracy and record loss
-        top1_acc = float('nan')
-        top5_acc = float('nan')
-        try:
-            maxk = min(5, model_logits.shape[-1])
-            if has_attr(args, "custom_accuracy"):
-                prec1, prec5 = args.custom_accuracy(model_logits, target)
-            else:
-                prec1, prec5 = helpers.accuracy(model_logits, target, topk=(1, maxk))
-                prec1, prec5 = prec1[0], prec5[0]
+            # measure accuracy and record loss
+            top1_acc = float('nan')
+            top5_acc = float('nan')
+            try:
+                maxk = min(5, model_logits.shape[-1])
+                if has_attr(args, "custom_accuracy"):
+                    prec1, prec5 = args.custom_accuracy(model_logits, target)
+                else:
+                    prec1, prec5 = helpers.accuracy(model_logits, target, topk=(1, maxk))
+                    prec1, prec5 = prec1[0], prec5[0]
 
-            losses.update(loss.item(), inp.size(0))
-            top1.update(prec1, inp.size(0))
-            top5.update(prec5, inp.size(0))
+                losses.update(loss.item(), inp.size(0))
+                top1.update(prec1, inp.size(0))
+                top5.update(prec5, inp.size(0))
 
-            top1_acc = top1.avg
-            top5_acc = top5.avg
-        except:
-            warnings.warn('Failed to calculate the accuracy.')
+                top1_acc = top1.avg
+                top5_acc = top5.avg
+            except:
+                warnings.warn('Failed to calculate the accuracy.')
 
-        reg_term = 0.0
-        if has_attr(args, "regularizer"):
-            reg_term =  args.regularizer(model, inp, target)
-        loss = loss + reg_term
+            reg_term = 0.0
+            if has_attr(args, "regularizer"):
+                reg_term =  args.regularizer(model, inp, target)
+            loss = loss + reg_term
 
         # compute gradient and do SGD step
         if is_train:
             opt.zero_grad()
-            if args.mixed_precision:
-                with amp.scale_loss(loss, opt) as sl:
-                    sl.backward()
-            else:
-                loss.backward()
-            opt.step()
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
 
         # ITERATOR
         desc = ('{2} Epoch:{0} | Loss {loss.avg:.4f} | '
