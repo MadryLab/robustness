@@ -152,7 +152,7 @@ def eval_model(args, model, loader, store):
     if store: store[consts.LOGS_TABLE].append_row(log_info)
     return log_info
 
-def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
+def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_ids=None,
             store=None, update_params=None, disable_no_grad=False,
             log_checkpoints=False):
     """
@@ -276,7 +276,7 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
         assert not hasattr(model, "module"), "model is already in DataParallel."
         model = ch.nn.DataParallel(model, device_ids=dp_device_ids).cuda()
     else:
-        opt, model, schedule = args.opt_model_and_schedule
+        opt, _, schedule = args.opt_model_and_schedule
 
     # Put the model into parallel mode
 
@@ -293,7 +293,7 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
     for epoch in range(start_epoch, args.epochs):
         # train for one epoch
         train_prec1, train_loss = _model_loop(args, 'train', train_loader, 
-                model, opt, epoch, args.adv_train, writer)
+                model, opt, epoch, args.adv_train, writer, data_aug=data_aug)
         last_epoch = (epoch == (args.epochs - 1))
 
         # evaluate on validation set
@@ -364,7 +364,8 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
 
     return model
 
-def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
+def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
+                data_aug=None):
     """
     *Internal function* (refer to the train_model and eval_model functions for
     how to train and evaluate models).
@@ -430,6 +431,9 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
 
     iterator = tqdm(enumerate(loader), total=len(loader))
     for i, (inp, target) in iterator:
+        if loop_type == 'train':
+            inp = data_aug(inp)
+
        # measure data loading time
         target = target.cuda(non_blocking=True)
         with autocast():
