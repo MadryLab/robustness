@@ -83,9 +83,11 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
 
     # Make schedule
     schedule = None
-    if args.custom_lr_multiplier == 'cyclic':
+    if args.custom_lr_multiplier[:6] == 'cyclic':
+        # E.g. `cyclic_5` for peaking at 5 epochs
         eps = args.epochs
-        lr_func = lambda t: np.interp([t+1], [0, eps*5//24, eps], [0, 1, 0])[0]
+        peak = int(args.custom_lr_multiplier.split('_')[-1])
+        lr_func = lambda t: np.interp([t+1], [0, peak, eps], [0, 1, 0])[0]
         schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
     elif args.custom_lr_multiplier:
         cs = args.custom_lr_multiplier
@@ -180,7 +182,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
                 momentum parameter for SGD optimizer
             step_lr (int)
                 if given, drop learning rate by 10x every `step_lr` steps
-            custom_lr_multplier (str)
+            custom_lr_multiplier (str)
                 If given, use a custom LR schedule, formed by multiplying the
                     original ``lr`` (format: [(epoch, LR_MULTIPLIER),...])
             lr_interpolation (str)
