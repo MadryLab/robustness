@@ -15,8 +15,6 @@ import warnings
 
 from torch.cuda.amp import GradScaler, autocast
 
-scaler = GradScaler()
-
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
     from tqdm import tqdm_notebook as tqdm
 else:
@@ -254,6 +252,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         disable_no_grad (bool) : if True, then even model evaluation will be
             run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
     """
+    scaler = GradScaler()
     # Logging setup
     writer = store.tensorboard if store else None
     prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
@@ -293,7 +292,8 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     for epoch in range(start_epoch, args.epochs):
         # train for one epoch
         train_prec1, train_loss = _model_loop(args, 'train', train_loader,
-                model, opt, epoch, args.adv_train, writer, data_aug=data_aug)
+                model, opt, epoch, args.adv_train, writer, data_aug=data_aug,
+                scaler=scaler)
         last_epoch = (epoch == (args.epochs - 1))
 
         # evaluate on validation set
@@ -365,7 +365,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     return model
 
 def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
-                data_aug=None):
+                data_aug=None, scaler=None):
     """
     *Internal function* (refer to the train_model and eval_model functions for
     how to train and evaluate models).
