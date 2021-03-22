@@ -436,6 +436,10 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
         if loop_type == 'train':
             inp = data_aug(inp)
 
+        # If we have tensor cores we use channel_last
+        if ch.cuda.get_device_capability()[0] >= 7:
+            inp = inp.to(memory_format=ch.channels_last)
+
         # measure data loading time
         target = target.cuda(non_blocking=True)
         with autocast():
