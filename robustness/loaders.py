@@ -1,7 +1,7 @@
 import argparse
 
-from . import cifar_models
-from .tools import folder
+from robustness import cifar_models
+from robustness.tools import folder
 
 import os
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
@@ -13,12 +13,18 @@ import shutil
 import time
 import numpy as np
 import torch as ch
+from glob import glob
 import torch.utils.data
 from torch.utils.data import DataLoader
 from torch.utils.data import Subset
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from . import imagenet_models as models
+import webdataset as wds
+from robustness import imagenet_models as models
+
+def get_shards(folder, split):
+    return glob(os.path.join(folder, f'*{split}*'))
+
 
 def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
                 custom_class=None, dataset="", label_mapping=None, subset=None,
@@ -44,53 +50,32 @@ def make_loaders(workers, batch_size, transforms, data_path, data_aug=True,
     if not val_batch_size:
         val_batch_size = batch_size
 
-    if not custom_class:
-        train_path = os.path.join(data_path, 'train')
-        test_path = os.path.join(data_path, 'val')
-        if not os.path.exists(test_path):
-            test_path = os.path.join(data_path, 'test')
-
-        if not os.path.exists(test_path):
-            raise ValueError("Test data must be stored in dataset/test or {0}".format(test_path))
-
-        if not only_val:
-            train_set = folder.ImageFolder(root=train_path, transform=transform_train,
-                                           label_mapping=label_mapping)
-        test_set = folder.ImageFolder(root=test_path, transform=transform_test,
-                                      label_mapping=label_mapping)
-    else:
-        if custom_class_args is None: custom_class_args = {}
-        if not only_val:
-            train_set = custom_class(root=data_path, train=True, download=True, 
-                                transform=transform_train, **custom_class_args)
-        test_set = custom_class(root=data_path, train=False, download=True, 
-                                transform=transform_test, **custom_class_args)
+    if label_mapping is None:
+        label_mapping = lambda x: x
 
     if not only_val:
-        attrs = ["samples", "train_data", "data"]
-        vals = {attr: hasattr(train_set, attr) for attr in attrs}
-        assert any(vals.values()), f"dataset must expose one of {attrs}"
-        train_sample_count = len(getattr(train_set,[k for k in vals if vals[k]][0]))
+        train_set = wds.Dataset(get_shards(data_path, 'train'), length=1281167//batch_size)
+        if shuffle_train:
+            train_set = train_set.shuffle(2000)
+        train_set = (train_set.decode("pil")
+                .to_tuple("jpg;png;jpeg cls")
+                .map_tuple(transform_train, label_mapping)
+                .batched(batch_size))
+    test_set = wds.Dataset(get_shards(data_path, 'val'), length=50000//batch_size)
 
-    if (not only_val) and (subset is not None) and (subset <= train_sample_count):
-        assert not only_val
-        if subset_type == 'rand':
-            rng = np.random.RandomState(seed)
-            subset = rng.choice(list(range(train_sample_count)), size=subset+subset_start, replace=False)
-            subset = subset[subset_start:]
-        elif subset_type == 'first':
-            subset = np.arange(subset_start, subset_start + subset)
-        else:
-            subset = np.arange(train_sample_count - subset, train_sample_count)
-
-        train_set = Subset(train_set, subset)
+    if shuffle_val:
+        test_set = test_set.shuffle(2000)
+    test_set = (test_set.decode("pil")
+                         .to_tuple("jpg;png;jpeg cls")
+                         .map_tuple(transform_train, label_mapping)
+                         .batched(batch_size))
 
     if not only_val:
-        train_loader = DataLoader(train_set, batch_size=batch_size, 
-            shuffle=shuffle_train, num_workers=workers, pin_memory=True)
+        train_loader = DataLoader(train_set, batch_size=None, 
+            num_workers=workers, pin_memory=True)
 
-    test_loader = DataLoader(test_set, batch_size=val_batch_size, 
-            shuffle=shuffle_val, num_workers=workers, pin_memory=True)
+    test_loader = DataLoader(test_set, batch_size=None, 
+            num_workers=workers, pin_memory=True)
 
     if only_val:
         return None, test_loader

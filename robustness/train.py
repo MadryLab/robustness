@@ -18,10 +18,9 @@ if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
 else:
     from tqdm import tqdm as tqdm
 
-try:
-    from apex import amp
-except Exception as e:
-    warnings.warn('Could not import amp.')
+from torch.cuda.amp import GradScaler, autocast
+
+scaler = GradScaler()
 
 def check_required_args(args, eval_only=False):
     """
@@ -84,7 +83,6 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
 
     if args.mixed_precision:
         model.to('cuda')
-        model, optimizer = amp.initialize(model, optimizer, 'O1')
 
     # Make schedule
     schedule = None
@@ -117,9 +115,6 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
                   f' Stepping {steps_to_take} times instead...')
             for i in range(steps_to_take):
                 schedule.step()
-        
-        if 'amp' in checkpoint and checkpoint['amp'] not in [None, 'N/A']:
-            amp.load_state_dict(checkpoint['amp'])
 
         # TODO: see if there's a smarter way to do this
         # TODO: see what's up with loading fp32 weights and then MP training
@@ -318,7 +313,6 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
             'optimizer':opt.state_dict(),
             'schedule':(schedule and schedule.state_dict()),
             'epoch': epoch+1,
-            'amp': amp.state_dict() if args.mixed_precision else None,
         }
 
 
@@ -441,12 +435,19 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
         }
 
     iterator = tqdm(enumerate(loader), total=len(loader))
+
     for i, (inp, target) in iterator:
        # measure data loading time
         target = target.cuda(non_blocking=True)
-        output, final_inp = model(inp, target=target, make_adv=adv,
-                                  **attack_kwargs)
-        loss = train_criterion(output, target)
+        if args.mixed_precision:
+            with autocast():
+                output, final_inp = model(inp, target=target, make_adv=adv,
+                                          **attack_kwargs)
+                loss = train_criterion(output, target)
+        else:
+            output, final_inp = model(inp, target=target, make_adv=adv,
+                                      **attack_kwargs)
+            loss = train_criterion(output, target)
 
         if len(loss.shape) > 0: loss = loss.mean()
 
@@ -481,11 +482,11 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
         if is_train:
             opt.zero_grad()
             if args.mixed_precision:
-                with amp.scale_loss(loss, opt) as sl:
-                    sl.backward()
+                scaler.scale(loss).backward()
             else:
                 loss.backward()
-            opt.step()
+            scaler.step(opt)
+            scaler.update()
         elif adv and i == 0 and writer:
             # add some examples to the tensorboard
             nat_grid = make_grid(inp[:15, ...])
