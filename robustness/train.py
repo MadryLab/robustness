@@ -1,7 +1,7 @@
 import torch as ch
 import numpy as np
 import torch.nn as nn
-from torch.optim import SGD, lr_scheduler
+from torch.optim import SGD, Adam, lr_scheduler
 from torchvision.utils import make_grid
 from cox.utils import Parameters
 
@@ -76,12 +76,19 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     """
     # Make optimizer
     param_list = model.parameters() if params is None else params
-    optimizer = SGD(param_list, args.lr, momentum=args.momentum,
-                                weight_decay=args.weight_decay)
+    if args.optimizer == 'SGD':
+        optimizer = SGD(param_list, args.lr, momentum=args.momentum,
+                                    weight_decay=args.weight_decay)
+    elif args.optimizer == 'Adam':
+        optimizer = Adam(param_list, lr=args.lr, betas=(0.9, 0.999), eps=1e-08,
+                         weight_decay=args.weight_decay)
 
     # Make schedule
     schedule = None
-    if args.custom_lr_multiplier[:6] == 'cyclic':
+    if args.custom_lr_multiplier == 'reduce_on_plateau':
+        schedule = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1,
+                                                  patience=5, mode='min')
+    elif args.custom_lr_multiplier[:6] == 'cyclic':
         # E.g. `cyclic_5` for peaking at 5 epochs
         eps = args.epochs
         peak = int(args.custom_lr_multiplier.split('_')[-1])
@@ -361,7 +368,11 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
                 'time':time.time() - start_time
             }
 
-        if schedule: schedule.step()
+        if schedule:
+            if 'reduce_on_plateau' in args.custom_lr_multiplier:
+                schedule.step(nat_loss)
+            else:
+                schedule.step()
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
 
     return model
@@ -467,7 +478,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
 
                 top1_acc = top1.avg
                 top5_acc = top5.avg
-            except:
+            except Exception as e:
                 warnings.warn('Failed to calculate the accuracy.')
 
             reg_term = 0.0
@@ -483,8 +494,8 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
             scaler.update()
 
         # ITERATOR
-        desc = ('{2} Epoch:{0} | Loss {loss.avg:.4f} | '
-                '{1}1 {top1_acc:.3f} | {1}5 {top5_acc:.3f} | '
+        desc = ('{2} Epoch:{0} | Loss {loss.avg:.8f} | '
+                '{1}1 {top1_acc:.3f} | {1}5 {top5_acc:.6f} | '
                 'Reg term: {reg} ||'.format( epoch, prec, loop_msg,
                 loss=losses, top1_acc=top1_acc, top5_acc=top5_acc, reg=reg_term))
 
