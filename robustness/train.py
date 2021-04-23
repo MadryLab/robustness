@@ -76,12 +76,12 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     """
     # Make optimizer
     param_list = model.parameters() if params is None else params
-    if args.optimizer == 'SGD':
-        optimizer = SGD(param_list, args.lr, momentum=args.momentum,
-                                    weight_decay=args.weight_decay)
-    elif args.optimizer == 'Adam':
+    if args.optimizer == 'Adam':
         optimizer = Adam(param_list, lr=args.lr, betas=(0.9, 0.999), eps=1e-08,
                          weight_decay=args.weight_decay)
+    else:
+        optimizer = SGD(param_list, args.lr, momentum=args.momentum,
+                                    weight_decay=args.weight_decay)
 
     # Make schedule
     schedule = None
