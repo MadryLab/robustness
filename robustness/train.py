@@ -353,7 +353,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
             if should_save_ckpt or last_epoch: save_checkpoint(ckpt_at_epoch(epoch))
 
             # Update the latest and best checkpoints (overrides old one)
-            save_checkpoint(consts.CKPT_NAME_LATEST)
+            # save_checkpoint(consts.CKPT_NAME_LATEST)
             if is_best: save_checkpoint(consts.CKPT_NAME_BEST)
         else:
             log_info = {
