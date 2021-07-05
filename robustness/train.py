@@ -54,7 +54,7 @@ def check_required_args(args, eval_only=False):
             without a custom adversarial loss (see docs)")
 
 
-def make_optimizer_and_schedule(args, model, checkpoint, params):
+def make_optimizer_and_schedule(args, model, checkpoint, params, iters_per_epoch):
     """
     *Internal Function* (called directly from train_model)
 
@@ -88,23 +88,27 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     if args.custom_lr_multiplier == 'reduce_on_plateau':
         schedule = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1,
                                                   patience=5, mode='min')
-    elif args.custom_lr_multiplier[:6] == 'cyclic':
+    elif args.custom_lr_multiplier.startswith('cyclic'):
         # E.g. `cyclic_5` for peaking at 5 epochs
-        eps = args.epochs
         peak = int(args.custom_lr_multiplier.split('_')[-1])
-        lr_func = lambda t: np.interp([t+1], [0, peak, eps], [0, 1, 0])[0]
-        schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
+        cyc_lr_func = lambda t: np.interp([t+1], [0, peak, args.epochs], [0, 1, 0])[0]
+        schedule = lr_scheduler.LambdaLR(optimizer, cyc_lr_func)
+    elif args.custom_lr_multiplier.startswith('itercyclic'):
+        peak = int(args.custom_lr_multiplier.split('_')[-1])
+        itercyc_lr_func = lambda t: np.interp([float(t+1) / iters_per_epoch], [0, peak, args.epochs], [0, 1, 0])[0]
+        schedule = lr_scheduler.LambdaLR(optimizer, itercyc_lr_func)
     elif args.custom_lr_multiplier:
         cs = args.custom_lr_multiplier
         periods = eval(cs) if type(cs) is str else cs
         if args.lr_interpolation == 'linear':
-            lr_func = lambda t: np.interp([t], *zip(*periods))[0]
+            lin_lr_func = lambda t: np.interp([t], *zip(*periods))[0]
         else:
             def lr_func(ep):
                 for (milestone, lr) in reversed(periods):
                     if ep >= milestone: return lr
                 return 1.0
-        schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
+            lin_lr_func = lr_func
+        schedule = lr_scheduler.LambdaLR(optimizer, lin_lr_func)
     elif args.step_lr:
         schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr, gamma=args.step_lr_gamma)
 
@@ -280,13 +284,16 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     train_loader, val_loader = loaders
     if not args.opt_model_and_schedule:
         opt, schedule = make_optimizer_and_schedule(args, model, checkpoint,
-                                                    update_params)
+                                                    update_params, len(train_loader))
         assert not hasattr(model, "module"), "model is already in DataParallel."
         model = ch.nn.DataParallel(model, device_ids=dp_device_ids).cuda()
     else:
         opt, _, schedule = args.opt_model_and_schedule
 
-    # Put the model into parallel mode
+    if args.custom_lr_multiplier.startswith('itercyclic'):
+        assert args.iteration_hook is None
+        def iter_hook(*_): schedule.step()
+        args.iteration_hook = iter_hook
 
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
@@ -371,7 +378,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         if schedule:
             if 'reduce_on_plateau' in args.custom_lr_multiplier:
                 schedule.step(nat_loss)
-            else:
+            elif not args.custom_lr_multiplier.startswith('itercyclic'):
                 schedule.step()
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
 
@@ -496,8 +503,9 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
         # ITERATOR
         desc = ('{2} Epoch:{0} | Loss {loss.avg:.8f} | '
                 '{1}1 {top1_acc:.3f} | {1}5 {top5_acc:.6f} | '
-                'Reg term: {reg} ||'.format( epoch, prec, loop_msg,
-                loss=losses, top1_acc=top1_acc, top5_acc=top5_acc, reg=reg_term))
+                'LR: {curr_lr} ||'.format( epoch, prec, loop_msg,
+                loss=losses, top1_acc=top1_acc, top5_acc=top5_acc, 
+                curr_lr='N/A' if opt is None else opt.param_groups[0]['lr']))
 
         # USER-DEFINED HOOK
         if has_attr(args, 'iteration_hook'):
