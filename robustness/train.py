@@ -451,6 +451,9 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
 
     iterator = tqdm(enumerate(loader), total=len(loader))
     for i, (inp, target) in iterator:
+        pass
+
+    for i, (inp, target) in iterator:
         if loop_type == 'train':
             inp = data_aug(inp)
 
