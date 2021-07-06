@@ -455,6 +455,8 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     for i, (inp, target) in iterator:
         pass
 
+    print('done iterating')
+
     for i, (inp, target) in iterator:
         if loop_type == 'train':
             inp = data_aug(inp)
