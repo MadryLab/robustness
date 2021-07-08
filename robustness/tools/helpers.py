@@ -96,7 +96,7 @@ class InputNormalize(ch.nn.Module):
         self.register_buffer("new_std", new_std)
 
     def forward(self, x):
-        x = ch.clamp(x, 0, 1)
+        # x = ch.clamp(x, 0, 1)
         x_normalized = (x - self.new_mean)/self.new_std
         return x_normalized
 
@@ -120,7 +120,12 @@ class DataPrefetcher():
             self.next_target = None
             return
         with ch.cuda.stream(self.stream):
-            self.next_input = self.next_input.cuda(non_blocking=True)
+            self.next_input = self.next_input.to(
+                device='cuda',
+                dtype=ch.float32,
+                memory_format=ch.channels_last,
+                non_blocking=True)
+
             self.next_target = self.next_target.cuda(non_blocking=True)
 
     def __iter__(self):
