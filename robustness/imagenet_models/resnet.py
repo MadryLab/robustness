@@ -7,7 +7,7 @@ from ..tools.custom_modules import SequentialWithArgs, FakeReLU
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
            'wide_resnet50_2', 'wide_resnet101_2',
-           'wide_resnet50_3', 'wide_resnet50_4', 'wide_resnet50_5', 
+           'wide_resnet50_3', 'wide_resnet50_4', 'wide_resnet50_5',
            'wide_resnet50_6', ]
 
 
@@ -57,7 +57,7 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x, fake_relu=False, no_relu=False):
+    def forward(self, x):
         identity = x
 
         out = self.conv1(x)
@@ -72,10 +72,6 @@ class BasicBlock(nn.Module):
 
         out += identity
 
-        if fake_relu:
-            return FakeReLU.apply(out)
-        if no_relu:
-            return out
         return self.relu(out)
 
 
@@ -201,10 +197,10 @@ class ResNet(nn.Module):
                                 base_width=self.base_width, dilation=self.dilation,
                                 norm_layer=norm_layer))
 
-        return SequentialWithArgs(*layers)
+        return nn.Sequential(*layers)
         # return nn.Sequential(*layers)
 
-    def _forward(self, x, with_latent=False, fake_relu=False, no_relu=False):
+    def _forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -213,13 +209,11 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        x = self.layer4(x, fake_relu=fake_relu, no_relu=no_relu)
+        x = self.layer4(x)
 
         x = self.avgpool(x)
         pre_out = torch.flatten(x, 1)
         final = self.fc(pre_out)
-        if with_latent:
-            return final, pre_out
         return final
 
     # Allow for accessing forward method in a inherited class
@@ -360,7 +354,7 @@ def wide_resnet50_3(pretrained=False, progress=True, **kwargs):
 
 
 def wide_resnet50_4(pretrained=False, progress=True, **kwargs):
-    r"""Wide ResNet-50-4 model 
+    r"""Wide ResNet-50-4 model
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr

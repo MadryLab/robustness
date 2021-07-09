@@ -122,10 +122,10 @@ class DataPrefetcher():
         with ch.cuda.stream(self.stream):
             self.next_input = self.next_input.to(
                 device='cuda',
-                dtype=ch.float32,
                 memory_format=ch.channels_last,
-                non_blocking=True)
-
+                #dtype=ch.float32,
+                non_blocking=True).float()
+            # self.next_input = self.next_input.to(
             self.next_target = self.next_target.cuda(non_blocking=True)
 
     def __iter__(self):
@@ -144,20 +144,31 @@ class DataPrefetcher():
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-    def __init__(self):
+    def __init__(self, name, fmt=':f'):
+        self.name = name
+        self.fmt = fmt
         self.reset()
 
     def reset(self):
         self.val = 0
-        self.avg = 0
         self.sum = 0
         self.count = 0
 
-    def update(self, val, n=1):
+    @property
+    def avg(self):
+        return self.sum / max(self.count, 1)
+
+    def update(self, val, _=0):
         self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+        self.sum += val
+        self.count += 1
+        # self.avg = self.sum / self.count
+
+    def __str__(self):
+        fmtstr = '{name} {val' + self.fmt + '} ({avg2' + self.fmt + '} ({sum' + self.fmt + '})'
+        self.avg2 = self.avg
+        # self.avg = (self.sum / max(self.count, 1))
+        return fmtstr.format(**self.__dict__)
 
 # ImageNet label mappings
 def get_label_mapping(dataset_name, ranges):

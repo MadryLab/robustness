@@ -1,4 +1,4 @@
-import torch 
+import torch
 from torch import nn
 ch = torch
 
@@ -16,12 +16,12 @@ class FakeReLUM(nn.Module):
         return FakeReLU.apply(x)
 
 class SequentialWithArgs(torch.nn.Sequential):
-    def forward(self, input, *args, **kwargs):
+    def forward(self, input):
         vs = list(self._modules.values())
         l = len(vs)
         for i in range(l):
             if i == l-1:
-                input = vs[i](input, *args, **kwargs)
+                input = vs[i](input)
             else:
                 input = vs[i](input)
         return input

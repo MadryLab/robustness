@@ -13,7 +13,8 @@ import os
 import time
 import warnings
 
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import autocast
+from apex import amp
 
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
     from tqdm import tqdm_notebook as tqdm
@@ -265,7 +266,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         disable_no_grad (bool) : if True, then even model evaluation will be
             run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
     """
-    scaler = GradScaler()
+    # scaler = GradScaler()
     # Logging setup
     writer = store.tensorboard if store else None
     prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
@@ -308,8 +309,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     for epoch in range(start_epoch, args.epochs):
         # train for one epoch
         train_prec1, train_loss = _model_loop(args, 'train', train_loader,
-                model, opt, epoch, args.adv_train, writer, data_aug=data_aug,
-                scaler=scaler)
+                model, opt, epoch, args.adv_train, writer, data_aug=data_aug)
         last_epoch = (epoch == (args.epochs - 1))
 
         # evaluate on validation set
@@ -385,7 +385,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     return model
 
 def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
-                data_aug=None, scaler=None):
+                data_aug=None):
     """
     *Internal function* (refer to the train_model and eval_model functions for
     how to train and evaluate models).
@@ -412,9 +412,10 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
         raise ValueError(err_msg)
     is_train = (loop_type == 'train')
 
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
+    # losses = AverageMeter('losses')
+    losses = AverageMeter('Loss', ':.4e')
+    # top1 = AverageMeter()
+    # top5 = AverageMeter()
 
     prec = 'NatPrec' if not adv else 'AdvPrec'
     loop_msg = 'Train' if loop_type == 'train' else 'Val'
@@ -437,91 +438,24 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     adv_criterion = args.custom_adv_loss if has_custom_adv_loss else None
 
     attack_kwargs = {}
-    if adv:
-        attack_kwargs = {
-            'constraint': args.constraint,
-            'eps': eps,
-            'step_size': args.attack_lr,
-            'iterations': args.attack_steps,
-            'random_start': args.random_start,
-            'custom_loss': adv_criterion,
-            'random_restarts': random_restarts,
-            'use_best': bool(args.use_best)
-        }
-
     iterator = tqdm(enumerate(loader), total=len(loader))
     
     for i, (inp, target) in iterator:
         if loop_type == 'train':
-            inp = data_aug(inp)
+            with autocast():
+                inp = data_aug(inp)
 
-        # If we have tensor cores we use channel_last
-        if ch.cuda.get_device_capability()[0] >= 8:
-            inp = inp.to(memory_format=ch.channels_last)
+        output = model(inp)
+        loss = train_criterion(output, target)
+        with ch.no_grad():
+            losses.update(loss)
 
-        # measure data loading time
-        target = target.cuda(non_blocking=True)
-        with autocast():
-            output = model(inp)
-            loss = train_criterion(output, target)
-
-            if len(loss.shape) > 0: loss = loss.mean()
-
-            model_logits = output[0] if (type(output) is tuple) else output
-
-            # measure accuracy and record loss
-            top1_acc = float('nan')
-            top5_acc = float('nan')
-            try:
-                maxk = min(5, model_logits.shape[-1])
-                if has_attr(args, "custom_accuracy"):
-                    prec1, prec5 = args.custom_accuracy(model_logits, target)
-                else:
-                    prec1, prec5 = helpers.accuracy(model_logits, target, topk=(1, maxk))
-                    prec1, prec5 = prec1[0], prec5[0]
-
-                losses.update(loss.item(), inp.size(0))
-                top1.update(prec1, inp.size(0))
-                top5.update(prec5, inp.size(0))
-
-                top1_acc = top1.avg
-                top5_acc = top5.avg
-            except Exception as e:
-                warnings.warn('Failed to calculate the accuracy.')
-
-            reg_term = 0.0
-            if has_attr(args, "regularizer"):
-                reg_term =  args.regularizer(model, inp, target)
-            loss = loss + reg_term
-
-        # compute gradient and do SGD step
         if is_train:
-            opt.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(opt)
-            scaler.update()
+            with amp.scale_loss(loss, opt) as scaled_loss:
+                scaled_loss.backward()
 
-        # ITERATOR
-        desc = ('{2} Epoch:{0} | Loss {loss.avg:.8f} | '
-                '{1}1 {top1_acc:.3f} | {1}5 {top5_acc:.6f} | '
-                'LR: {curr_lr} ||'.format( epoch, prec, loop_msg,
-                loss=losses, top1_acc=top1_acc, top5_acc=top5_acc, 
-                curr_lr='N/A' if opt is None else opt.param_groups[0]['lr']))
+            opt.zero_grad(set_to_none=True)
+            opt.step()
 
-        # USER-DEFINED HOOK
-        if has_attr(args, 'iteration_hook'):
-            args.iteration_hook(model, i, loop_type, inp, target)
-
-        iterator.set_description(desc)
-        iterator.refresh()
-
-    if writer is not None:
-        prec_type = 'adv' if adv else 'nat'
-        descs = ['loss', 'top1', 'top5']
-        vals = [losses, top1, top5]
-        for d, v in zip(descs, vals):
-            writer.add_scalar('_'.join([prec_type, loop_type, d]), v.avg,
-                              epoch)
-
-    return top1.avg, losses.avg
+    return 0., losses.avg
 
