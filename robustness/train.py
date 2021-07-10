@@ -453,9 +453,9 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
         if is_train:
             with amp.scale_loss(loss, opt) as scaled_loss:
                 scaled_loss.backward()
-
-            opt.zero_grad(set_to_none=True)
             opt.step()
+            opt.zero_grad(set_to_none=True)
 
+    print(f'{loop_msg} avg loss', losses.avg)
     return 0., losses.avg
 
