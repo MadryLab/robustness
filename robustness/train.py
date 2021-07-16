@@ -12,6 +12,8 @@ import dill
 import os
 import time
 import warnings
+from pytorch_loss import LabelSmoothSoftmaxCEV3
+from torch_ema import ExponentialMovingAverage
 
 from torch.cuda.amp import autocast
 from apex import amp
@@ -119,8 +121,8 @@ def make_optimizer_and_schedule(args, model, checkpoint, params, iters_per_epoch
 
     return optimizer, schedule
 
+"""
 def eval_model(args, model, loader, store):
-    """
     Evaluate a model for standard (and optionally adversarial) accuracy.
 
     Args:
@@ -130,7 +132,6 @@ def eval_model(args, model, loader, store):
         loader (iterable) : a dataloader serving `(input, label)` batches from
             the validation set
         store (cox.Store) : store for saving results in (via tensorboardX)
-    """
     check_required_args(args, eval_only=True)
     start_time = time.time()
 
@@ -163,6 +164,7 @@ def eval_model(args, model, loader, store):
     # Log info into the logs table
     if store: store[consts.LOGS_TABLE].append_row(log_info)
     return log_info
+"""
 
 def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_ids=None,
             store=None, update_params=None, disable_no_grad=False,
@@ -266,6 +268,11 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         disable_no_grad (bool) : if True, then even model evaluation will be
             run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
     """
+    assert os.environ['EMA'] in {'0', '1'}
+    SHOULD_EMA = (os.environ['EMA'] == '1')
+    if SHOULD_EMA:
+        ema = ExponentialMovingAverage(model.parameters(), decay=0.995)
+
     # scaler = GradScaler()
     # Logging setup
     writer = store.tensorboard if store else None
@@ -299,8 +306,9 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
+        model_data = (model, ema) if SHOULD_EMA else model
         best_prec1 = checkpoint[prec1_key] if prec1_key in checkpoint \
-            else _model_loop(args, 'val', val_loader, model, None,
+            else _model_loop(args, 'val', val_loader, model_data, None,
                             start_epoch-1, args.adv_train, writer)[0]
 
     # Timestamp for training start time
@@ -308,8 +316,9 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
 
     for epoch in range(start_epoch, args.epochs):
         # train for one epoch
+        model_data = (model, ema) if SHOULD_EMA else model
         train_prec1, train_loss = _model_loop(args, 'train', train_loader,
-                model, opt, epoch, args.adv_train, writer, data_aug=data_aug)
+                model_data, opt, epoch, args.adv_train, writer, data_aug=data_aug)
         last_epoch = (epoch == (args.epochs - 1))
 
         # evaluate on validation set
@@ -382,6 +391,8 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
                 schedule.step()
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
 
+    if SHOULD_EMA:
+        ema.copy_to(model.parameters())
     return model
 
 def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
@@ -407,6 +418,10 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     Returns:
         The average top1 accuracy and the average loss across the epoch.
     """
+    ema = None
+    if isinstance(model, tuple):
+        model, ema = model
+
     if not loop_type in ['train', 'val']:
         err_msg = "loop_type ({0}) must be 'train' or 'val'".format(loop_type)
         raise ValueError(err_msg)
@@ -431,8 +446,10 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
 
     # Custom training criterion
     has_custom_train_loss = has_attr(args, 'custom_train_loss')
+    default_train_crit = LabelSmoothSoftmaxCEV3(lb_smooth=0.1) if \
+        os.environ['LABEL_SMOOTHING'] == '1' else ch.nn.CrossEntropyLoss()
     train_criterion = args.custom_train_loss if has_custom_train_loss \
-            else ch.nn.CrossEntropyLoss()
+            else default_train_crit
 
     has_custom_adv_loss = has_attr(args, 'custom_adv_loss')
     adv_criterion = args.custom_adv_loss if has_custom_adv_loss else None
@@ -440,6 +457,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     attack_kwargs = {}
     iterator = tqdm(enumerate(loader), total=len(loader))
     
+    total_correct, total = 0., 0.
     for i, (inp, target) in iterator:
         if loop_type == 'train':
             with autocast():
@@ -455,7 +473,17 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
                 scaled_loss.backward()
             opt.step()
             opt.zero_grad(set_to_none=True)
+            if ema is not None: ema.update()
+        else:
+            corrects = output.argmax(1).eq(target)
+            total_correct += corrects.sum()
+            total += corrects.shape[0]
 
-    print(f'{loop_msg} avg loss', losses.avg)
+        if has_attr(args, 'iteration_hook'):
+            args.iteration_hook(None)
+
+    if not is_train: 
+        print(f'Val epoch {epoch}, accuracy {total_correct / total * 100:.2f}%', flush=True)
+    print(f'{loop_msg} avg loss', losses.avg, flush=True)
     return 0., losses.avg
 
