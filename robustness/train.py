@@ -13,7 +13,7 @@ import os
 import time
 import warnings
 from pytorch_loss import LabelSmoothSoftmaxCEV3
-from torch_ema import ExponentialMovingAverage
+from torch_ema import ExponentialMovingAverage as EMA
 
 from torch.cuda.amp import autocast
 from apex import amp
@@ -268,10 +268,8 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         disable_no_grad (bool) : if True, then even model evaluation will be
             run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
     """
-    assert os.environ['EMA'] in {'0', '1'}
-    SHOULD_EMA = (os.environ['EMA'] == '1')
-    if SHOULD_EMA:
-        ema = ExponentialMovingAverage(model.parameters(), decay=0.995)
+    SHOULD_EMA = (args.ema is not None)
+    ema = EMA(model.parameters(), decay=args.ema) if SHOULD_EMA else None
 
     # scaler = GradScaler()
     # Logging setup
@@ -306,7 +304,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
-        model_data = (model, ema) if SHOULD_EMA else model
+        model_data = (model, ema)
         best_prec1 = checkpoint[prec1_key] if prec1_key in checkpoint \
             else _model_loop(args, 'val', val_loader, model_data, None,
                             start_epoch-1, args.adv_train, writer)[0]
@@ -316,7 +314,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
 
     for epoch in range(start_epoch, args.epochs):
         # train for one epoch
-        model_data = (model, ema) if SHOULD_EMA else model
+        model_data = (model, ema)
         train_prec1, train_loss = _model_loop(args, 'train', train_loader,
                 model_data, opt, epoch, args.adv_train, writer, data_aug=data_aug)
         last_epoch = (epoch == (args.epochs - 1))
@@ -343,13 +341,13 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
             # log + get best
             ctx = ch.enable_grad() if disable_no_grad else ch.no_grad()
             with ctx:
-                prec1, nat_loss = _model_loop(args, 'val', val_loader, model,
+                prec1, nat_loss = _model_loop(args, 'val', val_loader, (model, None),
                         None, epoch, False, writer)
 
             # loader, model, epoch, input_adv_exs
             should_adv_eval = args.adv_eval or args.adv_train
             adv_val = should_adv_eval and _model_loop(args, 'val', val_loader,
-                    model, None, epoch, True, writer)
+                    (model, None), None, epoch, True, writer)
             adv_prec1, adv_loss = adv_val or (-1.0, -1.0)
 
             # remember best prec@1 and save checkpoint
@@ -418,9 +416,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     Returns:
         The average top1 accuracy and the average loss across the epoch.
     """
-    ema = None
-    if isinstance(model, tuple):
-        model, ema = model
+    model, ema = model
 
     if not loop_type in ['train', 'val']:
         err_msg = "loop_type ({0}) must be 'train' or 'val'".format(loop_type)
@@ -446,8 +442,8 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
 
     # Custom training criterion
     has_custom_train_loss = has_attr(args, 'custom_train_loss')
-    default_train_crit = LabelSmoothSoftmaxCEV3(lb_smooth=0.1) if \
-        os.environ['LABEL_SMOOTHING'] == '1' else ch.nn.CrossEntropyLoss()
+    default_train_crit = LabelSmoothSoftmaxCEV3(lb_smooth=args.label_smoothing) if \
+        args.label_smoothing is not None else ch.nn.CrossEntropyLoss()
     train_criterion = args.custom_train_loss if has_custom_train_loss \
             else default_train_crit
 
