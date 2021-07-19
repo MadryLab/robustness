@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn as nn
 from torch.optim import SGD, Adam, lr_scheduler
 from torchvision.utils import make_grid
+from torch.nn.utils import parameters_to_vector as flatten
 from cox.utils import Parameters
 
 from .tools import helpers
@@ -79,9 +80,20 @@ def make_optimizer_and_schedule(args, model, checkpoint, params, iters_per_epoch
     """
     # Make optimizer
     param_list = model.parameters() if params is None else params
+
     if args.optimizer == 'Adam':
         optimizer = Adam(param_list, lr=args.lr, betas=(0.9, 0.999), eps=1e-08,
                          weight_decay=args.weight_decay)
+    elif args.optimizer == 'SGD_no_bn_wd':
+        all_params = {k: v for (k, v) in model.named_parameters()}
+        param_groups = [{
+                            'params': [all_params[k] for k in all_params if ('bn' in k)],
+                            'weight_decay': 0.
+                        }, {
+                            'params': [all_params[k] for k in all_params if not ('bn' in k)],
+                            'weight_decay': args.weight_decay
+                        }]
+        optimizer = SGD(param_groups, args.lr, momentum=args.momentum)
     else:
         optimizer = SGD(param_list, args.lr, momentum=args.momentum,
                                     weight_decay=args.weight_decay)
@@ -93,11 +105,14 @@ def make_optimizer_and_schedule(args, model, checkpoint, params, iters_per_epoch
                                                   patience=5, mode='min')
     elif args.custom_lr_multiplier.startswith('cyclic'):
         # E.g. `cyclic_5` for peaking at 5 epochs
-        peak = int(args.custom_lr_multiplier.split('_')[-1])
+        # peak = int(args.custom_lr_multiplier.split('_')[-1])
+        peak = float(args.custom_lr_multiplier.split('_')[-1])
         cyc_lr_func = lambda t: np.interp([t+1], [0, peak, args.epochs], [0, 1, 0])[0]
         schedule = lr_scheduler.LambdaLR(optimizer, cyc_lr_func)
     elif args.custom_lr_multiplier.startswith('itercyclic'):
-        peak = int(args.custom_lr_multiplier.split('_')[-1])
+        # peak = int(args.custom_lr_multiplier.split('_')[-1])
+        peak = float(args.custom_lr_multiplier.split('_')[-1])
+        # itercyc_lr_func = lambda t: np.interp([float(t+1) / iters_per_epoch], [0, peak, args.epochs], [0, 1, 0])[0]
         itercyc_lr_func = lambda t: np.interp([float(t+1) / iters_per_epoch], [0, peak, args.epochs], [0, 1, 0])[0]
         schedule = lr_scheduler.LambdaLR(optimizer, itercyc_lr_func)
     elif args.custom_lr_multiplier:
@@ -313,6 +328,8 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     start_time = time.time()
 
     for epoch in range(start_epoch, args.epochs):
+        if hasattr(train_loader.dataset, 'next_epoch'):
+            train_loader.dataset.next_epoch()
         # train for one epoch
         model_data = (model, ema)
         train_prec1, train_loss = _model_loop(args, 'train', train_loader,
@@ -390,7 +407,10 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
 
     if SHOULD_EMA:
+        vec_1 = flatten(model.parameters()).cpu()
         ema.copy_to(model.parameters())
+        vec_2 = flatten(model.parameters()).cpu()
+        print(f'EMA Norm difference: {ch.norm(vec_1 - vec_2):.2f}')
     return model
 
 def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
@@ -453,12 +473,18 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     attack_kwargs = {}
     iterator = tqdm(enumerate(loader), total=len(loader))
     
+    should_crop = hasattr(loader.dataset, 'current_crop') 
+    if should_crop:
+        crop_x, crop_y = loader.dataset.current_crop.numpy()
+        
     total_correct, total = 0., 0.
     for i, (inp, target) in iterator:
         if loop_type == 'train':
             with autocast():
                 inp = data_aug(inp)
 
+        if should_crop:
+            inp = inp[:, :, :crop_x, :crop_y]
         output = model(inp)
         loss = train_criterion(output, target)
         with ch.no_grad():
