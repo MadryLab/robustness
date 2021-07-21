@@ -14,7 +14,6 @@ import os
 import time
 import warnings
 from pytorch_loss import LabelSmoothSoftmaxCEV3
-from torch_ema import ExponentialMovingAverage as EMA
 
 from torch.cuda.amp import autocast
 from apex import amp
@@ -283,9 +282,6 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         disable_no_grad (bool) : if True, then even model evaluation will be
             run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
     """
-    SHOULD_EMA = (args.ema is not None)
-    ema = EMA(model.parameters(), decay=args.ema) if SHOULD_EMA else None
-
     # scaler = GradScaler()
     # Logging setup
     writer = store.tensorboard if store else None
@@ -319,9 +315,8 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
         start_epoch = checkpoint['epoch']
-        model_data = (model, ema)
         best_prec1 = checkpoint[prec1_key] if prec1_key in checkpoint \
-            else _model_loop(args, 'val', val_loader, model_data, None,
+            else _model_loop(args, 'val', val_loader, model, None,
                             start_epoch-1, args.adv_train, writer)[0]
 
     # Timestamp for training start time
@@ -331,9 +326,8 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         if hasattr(train_loader.dataset, 'next_epoch'):
             train_loader.dataset.next_epoch()
         # train for one epoch
-        model_data = (model, ema)
         train_prec1, train_loss = _model_loop(args, 'train', train_loader,
-                model_data, opt, epoch, args.adv_train, writer, data_aug=data_aug)
+                model, opt, epoch, args.adv_train, writer, data_aug=data_aug)
         last_epoch = (epoch == (args.epochs - 1))
 
         # evaluate on validation set
@@ -406,11 +400,6 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
                 schedule.step()
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
 
-    if SHOULD_EMA:
-        vec_1 = flatten(model.parameters()).cpu()
-        ema.copy_to(model.parameters())
-        vec_2 = flatten(model.parameters()).cpu()
-        print(f'EMA Norm difference: {ch.norm(vec_1 - vec_2):.2f}')
     return model
 
 def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
@@ -436,7 +425,6 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     Returns:
         The average top1 accuracy and the average loss across the epoch.
     """
-    model, ema = model
 
     if not loop_type in ['train', 'val']:
         err_msg = "loop_type ({0}) must be 'train' or 'val'".format(loop_type)
@@ -495,7 +483,6 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
                 scaled_loss.backward()
             opt.step()
             opt.zero_grad(set_to_none=True)
-            if ema is not None: ema.update()
         else:
             corrects = output.argmax(1).eq(target)
             total_correct += corrects.sum()
