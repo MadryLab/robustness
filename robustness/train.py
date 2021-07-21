@@ -352,13 +352,13 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
             # log + get best
             ctx = ch.enable_grad() if disable_no_grad else ch.no_grad()
             with ctx:
-                prec1, nat_loss = _model_loop(args, 'val', val_loader, (model, None),
+                prec1, nat_loss = _model_loop(args, 'val', val_loader, model,
                         None, epoch, False, writer)
 
             # loader, model, epoch, input_adv_exs
             should_adv_eval = args.adv_eval or args.adv_train
             adv_val = should_adv_eval and _model_loop(args, 'val', val_loader,
-                    (model, None), None, epoch, True, writer)
+                    model, None, epoch, True, writer)
             adv_prec1, adv_loss = adv_val or (-1.0, -1.0)
 
             # remember best prec@1 and save checkpoint
