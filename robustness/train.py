@@ -348,7 +348,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         should_save_ckpt = (epoch % save_its == 0) and (save_its > 0)
         should_log = (epoch % args.log_iters == 0)
 
-        if should_log or last_epoch or should_save_ckpt:
+        if epoch > 0 and (should_log or last_epoch or should_save_ckpt):
             # log + get best
             ctx = ch.enable_grad() if disable_no_grad else ch.no_grad()
             with ctx:
@@ -432,7 +432,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     is_train = (loop_type == 'train')
 
     # losses = AverageMeter('losses')
-    losses = AverageMeter('Loss', ':.4e')
+    # losses = AverageMeter('Loss', ':.4e')
     # top1 = AverageMeter()
     # top5 = AverageMeter()
 
@@ -475,8 +475,8 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
             inp = inp[:, :, :crop_x, :crop_y]
         output = model(inp)
         loss = train_criterion(output, target)
-        with ch.no_grad():
-            losses.update(loss)
+        # with ch.no_grad():
+            # losses.update(loss)
 
         if is_train:
             with amp.scale_loss(loss, opt) as scaled_loss:
@@ -493,6 +493,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
 
     if not is_train: 
         print(f'Val epoch {epoch}, accuracy {total_correct / total * 100:.2f}%', flush=True)
-    print(f'{loop_msg} avg loss', losses.avg, flush=True)
-    return 0., losses.avg
+    # print(f'{loop_msg} avg loss', losses.avg, flush=True)
+    # return 0., losses.avg
+    return 0., 0.
 
