@@ -96,63 +96,141 @@ class InputNormalize(ch.nn.Module):
         self.register_buffer("new_std", new_std)
 
     def forward(self, x):
-        x = ch.clamp(x, 0, 1)
+        # x = ch.clamp(x, 0, 1)
         x_normalized = (x - self.new_mean)/self.new_std
         return x_normalized
+
+# class DataPrefetcher():
+#     def __init__(self, loader, stop_after=None):
+#         self.loader = loader
+#         self.dataset = loader.dataset
+
+#     def __len__(self):
+#         return len(self.loader)
+
+#     def __iter__(self):
+#         # count = 0
+#         # self.loaditer = iter(self.loader)
+#         # self.preload()
+#         # for i in range(loaditer)
+#         # while self.next_input is not None:
+#         #     ch.cuda.current_stream().wait_stream(self.stream)
+#         #     input = self.next_input
+#         #     target = self.next_target
+#         #     self.preload()
+#         #     count += 1
+#         #     yield input, target
+#         #     if type(self.stop_after) is int and (count > self.stop_after):
+#         #         break
+#         prev_x, prev_y = None, None
+#         for _, (x, y) in enumerate(self.loader):
+#             x = x.to(device='cuda', memory_format=ch.channels_last,
+#                      non_blocking=True).to(dtype=ch.float32, non_blocking=True)
+#             y = y.to(device='cuda', non_blocking=True)
+#             if prev_x is None:
+#                 prev_x, prev_y = x, y
+#             else:
+#                 yield prev_x, prev_y
+#                 prev_x, prev_y = x, y
+
+#         yield prev_x, prev_y
 
 class DataPrefetcher():
     def __init__(self, loader, stop_after=None):
         self.loader = loader
-        self.dataset = loader.dataset
-        self.stream = ch.cuda.Stream()
-        self.stop_after = stop_after
-        self.next_input = None
-        self.next_target = None
+        self.dataset = self.loader.dataset
 
     def __len__(self):
         return len(self.loader)
 
+    def __iter__(self):
+        prefetcher = data_prefetcher(self.loader)
+        x, y = prefetcher.next()
+        while x is not None:
+            yield x, y
+            x, y = prefetcher.next()
+
+class data_prefetcher():
+    def __init__(self, loader):
+        self.loader = iter(loader)
+        self.stream = ch.cuda.Stream()
+        # With Amp, it isn't necessary to manually convert data to half.
+        # if args.fp16:
+        #     self.mean = self.mean.half()
+        #     self.std = self.std.half()
+        self.preload()
+
     def preload(self):
         try:
-            self.next_input, self.next_target = next(self.loaditer)
+            self.next_input, self.next_target = next(self.loader)
         except StopIteration:
             self.next_input = None
             self.next_target = None
             return
+        # if record_stream() doesn't work, another option is to make sure device inputs are created
+        # on the main stream.
+        # self.next_input_gpu = ch.empty_like(self.next_input, device='cuda')
+        # self.next_target_gpu = ch.empty_like(self.next_target, device='cuda')
+        # Need to make sure the memory allocated for next_* is not still in use by the main stream
+        # at the time we start copying to next_*:
+        # self.stream.wait_stream(ch.cuda.current_stream())
         with ch.cuda.stream(self.stream):
-            self.next_input = self.next_input.cuda(non_blocking=True)
+            # self.next_input = self.next_input.cuda(non_blocking=True)
             self.next_target = self.next_target.cuda(non_blocking=True)
+            # more code for the alternative if record_stream() doesn't work:
+            # copy_ will record the use of the pinned source tensor in this side stream.
+            # self.next_input_gpu.copy_(self.next_input, non_blocking=True)
+            # self.next_target_gpu.copy_(self.next_target, non_blocking=True)
+            # self.next_input = self.next_input_gpu
+            # self.next_target = self.next_target_gpu
 
-    def __iter__(self):
-        count = 0
-        self.loaditer = iter(self.loader)
+            # With Amp, it isn't necessary to manually convert data to half.
+            # if args.fp16:
+            #     self.next_input = self.next_input.half()
+            # else:
+            self.next_input = self.next_input.to(device='cuda', memory_format=ch.channels_last,
+                                                 non_blocking=True).to(dtype=ch.float32, non_blocking=True)
+            # to(dtype=ch.float32, non_blocking=True)
+
+    def next(self):
+        ch.cuda.current_stream().wait_stream(self.stream)
+        input = self.next_input
+        target = self.next_target
+        if input is not None:
+            input.record_stream(ch.cuda.current_stream())
+        if target is not None:
+            target.record_stream(ch.cuda.current_stream())
         self.preload()
-        while self.next_input is not None:
-            ch.cuda.current_stream().wait_stream(self.stream)
-            input = self.next_input
-            target = self.next_target
-            self.preload()
-            count += 1
-            yield input, target
-            if type(self.stop_after) is int and (count > self.stop_after):
-                break
+        return input, target
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
-    def __init__(self):
+    def __init__(self, name, fmt=':f'):
+        self.name = name
+        self.fmt = fmt
         self.reset()
 
     def reset(self):
         self.val = 0
-        self.avg = 0
         self.sum = 0
         self.count = 0
 
-    def update(self, val, n=1):
+    @property
+    def avg(self):
+        return self.sum / max(self.count, 1)
+
+    def update(self, val, _=0):
         self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+        self.sum += val
+        self.count += 1
+        # self.avg = self.sum / self.count
+
+    def __str__(self):
+        fmtstr = '{name} {val' + self.fmt + '} ({avg2' + self.fmt + '} ({sum' + self.fmt + '})'
+        self.avg2 = self.avg
+        # self.avg = (self.sum / max(self.count, 1))
+        return fmtstr.format(**self.__dict__)
 
 # ImageNet label mappings
 def get_label_mapping(dataset_name, ranges):

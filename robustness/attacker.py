@@ -271,6 +271,7 @@ class AttackerModel(ch.nn.Module):
     def __init__(self, model, dataset):
         super(AttackerModel, self).__init__()
         self.normalizer = helpers.InputNormalize(dataset.mean, dataset.std)
+        self.normalizer = ch.jit.script(self.normalizer)
         self.model = model
 
     def forward(self, inp):

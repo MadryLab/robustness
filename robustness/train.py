@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn as nn
 from torch.optim import SGD, Adam, lr_scheduler
 from torchvision.utils import make_grid
+from torch.nn.utils import parameters_to_vector as flatten
 from cox.utils import Parameters
 
 from .tools import helpers
@@ -12,8 +13,10 @@ import dill
 import os
 import time
 import warnings
+from pytorch_loss import LabelSmoothSoftmaxCEV3
 
-from torch.cuda.amp import GradScaler, autocast
+from torch.cuda.amp import autocast
+from apex import amp
 
 if int(os.environ.get("NOTEBOOK_MODE", 0)) == 1:
     from tqdm import tqdm_notebook as tqdm
@@ -54,7 +57,7 @@ def check_required_args(args, eval_only=False):
             without a custom adversarial loss (see docs)")
 
 
-def make_optimizer_and_schedule(args, model, checkpoint, params):
+def make_optimizer_and_schedule(args, model, checkpoint, params, iters_per_epoch):
     """
     *Internal Function* (called directly from train_model)
 
@@ -76,9 +79,20 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     """
     # Make optimizer
     param_list = model.parameters() if params is None else params
+
     if args.optimizer == 'Adam':
         optimizer = Adam(param_list, lr=args.lr, betas=(0.9, 0.999), eps=1e-08,
                          weight_decay=args.weight_decay)
+    elif args.optimizer == 'SGD_no_bn_wd':
+        all_params = {k: v for (k, v) in model.named_parameters()}
+        param_groups = [{
+                            'params': [all_params[k] for k in all_params if ('bn' in k)],
+                            'weight_decay': 0.
+                        }, {
+                            'params': [all_params[k] for k in all_params if not ('bn' in k)],
+                            'weight_decay': args.weight_decay
+                        }]
+        optimizer = SGD(param_groups, args.lr, momentum=args.momentum)
     else:
         optimizer = SGD(param_list, args.lr, momentum=args.momentum,
                                     weight_decay=args.weight_decay)
@@ -88,23 +102,30 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
     if args.custom_lr_multiplier == 'reduce_on_plateau':
         schedule = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1,
                                                   patience=5, mode='min')
-    elif args.custom_lr_multiplier[:6] == 'cyclic':
+    elif args.custom_lr_multiplier.startswith('cyclic'):
         # E.g. `cyclic_5` for peaking at 5 epochs
-        eps = args.epochs
-        peak = int(args.custom_lr_multiplier.split('_')[-1])
-        lr_func = lambda t: np.interp([t+1], [0, peak, eps], [0, 1, 0])[0]
-        schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
+        # peak = int(args.custom_lr_multiplier.split('_')[-1])
+        peak = float(args.custom_lr_multiplier.split('_')[-1])
+        cyc_lr_func = lambda t: np.interp([t+1], [0, peak, args.epochs], [0, 1, 0])[0]
+        schedule = lr_scheduler.LambdaLR(optimizer, cyc_lr_func)
+    elif args.custom_lr_multiplier.startswith('itercyclic'):
+        # peak = int(args.custom_lr_multiplier.split('_')[-1])
+        peak = float(args.custom_lr_multiplier.split('_')[-1])
+        # itercyc_lr_func = lambda t: np.interp([float(t+1) / iters_per_epoch], [0, peak, args.epochs], [0, 1, 0])[0]
+        itercyc_lr_func = lambda t: np.interp([float(t+1) / iters_per_epoch], [0, peak, args.epochs], [0, 1, 0])[0]
+        schedule = lr_scheduler.LambdaLR(optimizer, itercyc_lr_func)
     elif args.custom_lr_multiplier:
         cs = args.custom_lr_multiplier
         periods = eval(cs) if type(cs) is str else cs
         if args.lr_interpolation == 'linear':
-            lr_func = lambda t: np.interp([t], *zip(*periods))[0]
+            lin_lr_func = lambda t: np.interp([t], *zip(*periods))[0]
         else:
             def lr_func(ep):
                 for (milestone, lr) in reversed(periods):
                     if ep >= milestone: return lr
                 return 1.0
-        schedule = lr_scheduler.LambdaLR(optimizer, lr_func)
+            lin_lr_func = lr_func
+        schedule = lr_scheduler.LambdaLR(optimizer, lin_lr_func)
     elif args.step_lr:
         schedule = lr_scheduler.StepLR(optimizer, step_size=args.step_lr, gamma=args.step_lr_gamma)
 
@@ -114,8 +135,8 @@ def make_optimizer_and_schedule(args, model, checkpoint, params):
 
     return optimizer, schedule
 
+"""
 def eval_model(args, model, loader, store):
-    """
     Evaluate a model for standard (and optionally adversarial) accuracy.
 
     Args:
@@ -125,7 +146,6 @@ def eval_model(args, model, loader, store):
         loader (iterable) : a dataloader serving `(input, label)` batches from
             the validation set
         store (cox.Store) : store for saving results in (via tensorboardX)
-    """
     check_required_args(args, eval_only=True)
     start_time = time.time()
 
@@ -158,6 +178,7 @@ def eval_model(args, model, loader, store):
     # Log info into the logs table
     if store: store[consts.LOGS_TABLE].append_row(log_info)
     return log_info
+"""
 
 def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_ids=None,
             store=None, update_params=None, disable_no_grad=False,
@@ -261,7 +282,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         disable_no_grad (bool) : if True, then even model evaluation will be
             run with autograd enabled (otherwise it will be wrapped in a ch.no_grad())
     """
-    scaler = GradScaler()
+    # scaler = GradScaler()
     # Logging setup
     writer = store.tensorboard if store else None
     prec1_key = f"{'adv' if args.adv_train else 'nat'}_prec1"
@@ -280,13 +301,16 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     train_loader, val_loader = loaders
     if not args.opt_model_and_schedule:
         opt, schedule = make_optimizer_and_schedule(args, model, checkpoint,
-                                                    update_params)
+                                                    update_params, len(train_loader))
         assert not hasattr(model, "module"), "model is already in DataParallel."
         model = ch.nn.DataParallel(model, device_ids=dp_device_ids).cuda()
     else:
         opt, _, schedule = args.opt_model_and_schedule
 
-    # Put the model into parallel mode
+    if args.custom_lr_multiplier.startswith('itercyclic'):
+        assert args.iteration_hook is None
+        def iter_hook(*_): schedule.step()
+        args.iteration_hook = iter_hook
 
     best_prec1, start_epoch = (0, 0)
     if checkpoint:
@@ -299,10 +323,11 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
     start_time = time.time()
 
     for epoch in range(start_epoch, args.epochs):
+        if hasattr(train_loader.dataset, 'next_epoch'):
+            train_loader.dataset.next_epoch()
         # train for one epoch
         train_prec1, train_loss = _model_loop(args, 'train', train_loader,
-                model, opt, epoch, args.adv_train, writer, data_aug=data_aug,
-                scaler=scaler)
+                model, opt, epoch, args.adv_train, writer, data_aug=data_aug)
         last_epoch = (epoch == (args.epochs - 1))
 
         # evaluate on validation set
@@ -323,7 +348,7 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         should_save_ckpt = (epoch % save_its == 0) and (save_its > 0)
         should_log = (epoch % args.log_iters == 0)
 
-        if should_log or last_epoch or should_save_ckpt:
+        if epoch > 0 and (should_log or last_epoch or should_save_ckpt):
             # log + get best
             ctx = ch.enable_grad() if disable_no_grad else ch.no_grad()
             with ctx:
@@ -371,14 +396,14 @@ def train_model(args, model, data_aug, loaders, *, checkpoint=None, dp_device_id
         if schedule:
             if 'reduce_on_plateau' in args.custom_lr_multiplier:
                 schedule.step(nat_loss)
-            else:
+            elif not args.custom_lr_multiplier.startswith('itercyclic'):
                 schedule.step()
         if has_attr(args, 'epoch_hook'): args.epoch_hook(model, log_info)
 
     return model
 
 def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
-                data_aug=None, scaler=None):
+                data_aug=None):
     """
     *Internal function* (refer to the train_model and eval_model functions for
     how to train and evaluate models).
@@ -400,14 +425,16 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
     Returns:
         The average top1 accuracy and the average loss across the epoch.
     """
+
     if not loop_type in ['train', 'val']:
         err_msg = "loop_type ({0}) must be 'train' or 'val'".format(loop_type)
         raise ValueError(err_msg)
     is_train = (loop_type == 'train')
 
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
+    # losses = AverageMeter('losses')
+    # losses = AverageMeter('Loss', ':.4e')
+    # top1 = AverageMeter()
+    # top5 = AverageMeter()
 
     prec = 'NatPrec' if not adv else 'AdvPrec'
     loop_msg = 'Train' if loop_type == 'train' else 'Val'
@@ -423,96 +450,50 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer,
 
     # Custom training criterion
     has_custom_train_loss = has_attr(args, 'custom_train_loss')
+    default_train_crit = LabelSmoothSoftmaxCEV3(lb_smooth=args.label_smoothing) if \
+        args.label_smoothing is not None else ch.nn.CrossEntropyLoss()
     train_criterion = args.custom_train_loss if has_custom_train_loss \
-            else ch.nn.CrossEntropyLoss()
+            else default_train_crit
 
     has_custom_adv_loss = has_attr(args, 'custom_adv_loss')
     adv_criterion = args.custom_adv_loss if has_custom_adv_loss else None
 
     attack_kwargs = {}
-    if adv:
-        attack_kwargs = {
-            'constraint': args.constraint,
-            'eps': eps,
-            'step_size': args.attack_lr,
-            'iterations': args.attack_steps,
-            'random_start': args.random_start,
-            'custom_loss': adv_criterion,
-            'random_restarts': random_restarts,
-            'use_best': bool(args.use_best)
-        }
-
     iterator = tqdm(enumerate(loader), total=len(loader))
+    
+    should_crop = hasattr(loader.dataset, 'current_crop') 
+    if should_crop:
+        crop_x, crop_y = loader.dataset.current_crop.numpy()
+        
+    total_correct, total = 0., 0.
     for i, (inp, target) in iterator:
         if loop_type == 'train':
-            inp = data_aug(inp)
+            with autocast():
+                inp = data_aug(inp)
 
-        # If we have tensor cores we use channel_last
-        if ch.cuda.get_device_capability()[0] >= 8:
-            inp = inp.to(memory_format=ch.channels_last)
+        if should_crop:
+            inp = inp[:, :, :crop_x, :crop_y]
+        output = model(inp)
+        loss = train_criterion(output, target)
+        # with ch.no_grad():
+            # losses.update(loss)
 
-        # measure data loading time
-        target = target.cuda(non_blocking=True)
-        with autocast():
-            output = model(inp)
-            loss = train_criterion(output, target)
-
-            if len(loss.shape) > 0: loss = loss.mean()
-
-            model_logits = output[0] if (type(output) is tuple) else output
-
-            # measure accuracy and record loss
-            top1_acc = float('nan')
-            top5_acc = float('nan')
-            try:
-                maxk = min(5, model_logits.shape[-1])
-                if has_attr(args, "custom_accuracy"):
-                    prec1, prec5 = args.custom_accuracy(model_logits, target)
-                else:
-                    prec1, prec5 = helpers.accuracy(model_logits, target, topk=(1, maxk))
-                    prec1, prec5 = prec1[0], prec5[0]
-
-                losses.update(loss.item(), inp.size(0))
-                top1.update(prec1, inp.size(0))
-                top5.update(prec5, inp.size(0))
-
-                top1_acc = top1.avg
-                top5_acc = top5.avg
-            except Exception as e:
-                warnings.warn('Failed to calculate the accuracy.')
-
-            reg_term = 0.0
-            if has_attr(args, "regularizer"):
-                reg_term =  args.regularizer(model, inp, target)
-            loss = loss + reg_term
-
-        # compute gradient and do SGD step
         if is_train:
-            opt.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(opt)
-            scaler.update()
+            with amp.scale_loss(loss, opt) as scaled_loss:
+                scaled_loss.backward()
+            opt.step()
+            opt.zero_grad(set_to_none=True)
+        else:
+            corrects = output.argmax(1).eq(target)
+            total_correct += corrects.sum()
+            total += corrects.shape[0]
 
-        # ITERATOR
-        desc = ('{2} Epoch:{0} | Loss {loss.avg:.8f} | '
-                '{1}1 {top1_acc:.3f} | {1}5 {top5_acc:.6f} | '
-                'Reg term: {reg} ||'.format( epoch, prec, loop_msg,
-                loss=losses, top1_acc=top1_acc, top5_acc=top5_acc, reg=reg_term))
-
-        # USER-DEFINED HOOK
         if has_attr(args, 'iteration_hook'):
-            args.iteration_hook(model, i, loop_type, inp, target)
+            args.iteration_hook(None)
 
-        iterator.set_description(desc)
-        iterator.refresh()
-
-    if writer is not None:
-        prec_type = 'adv' if adv else 'nat'
-        descs = ['loss', 'top1', 'top5']
-        vals = [losses, top1, top5]
-        for d, v in zip(descs, vals):
-            writer.add_scalar('_'.join([prec_type, loop_type, d]), v.avg,
-                              epoch)
-
-    return top1.avg, losses.avg
+    if not is_train: 
+        print(f'Val epoch {epoch}, accuracy {total_correct / total * 100:.2f}%', flush=True)
+    # print(f'{loop_msg} avg loss', losses.avg, flush=True)
+    # return 0., losses.avg
+    return 0., 0.
 
