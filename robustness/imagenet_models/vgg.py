@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from torchvision.models.utils import load_state_dict_from_url
+from torch.hub import load_state_dict_from_url
 from ..tools.custom_modules import FakeReLUM
 
 __all__ = [
