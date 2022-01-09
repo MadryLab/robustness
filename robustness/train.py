@@ -501,7 +501,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
 
         # USER-DEFINED HOOK
         if has_attr(args, 'iteration_hook'):
-            args.iteration_hook(model, i, loop_type, inp, target)
+            args.iteration_hook(model, i, loop_type, inp, target, losses, top1, top5)
 
         iterator.set_description(desc)
         iterator.refresh()
