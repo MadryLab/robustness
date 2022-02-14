@@ -171,6 +171,6 @@ Contributors
 
 .. [STM20] Santurkar S., Tsipras D., Madry A. (2020). BREEDS: Benchmarks for Subpopulation Shift. arXiv, arXiv:2008.04859
 
-.. [SIE+21] Salman H., Ilyas A., Engstrom L., Vemparala S., Kapoor A., Madry A. (2021). Unadversarial Examples: Designing Objects for Robust Vision. arXiv, arXiv:2012.12235
+.. [SIE+21] Salman H., Ilyas A., Engstrom L., Vemprala S., Kapoor A., Madry A. (2021). Unadversarial Examples: Designing Objects for Robust Vision. arXiv, arXiv:2012.12235
 
 .. [SJW+21] Salman H., Jain S., Wong E., Madry A. (2021). : Certified Patch Robustness via Smoothed Vision Transformers. arXiv, arXiv:2110.07719
