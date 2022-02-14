@@ -18,6 +18,10 @@ upcoming code releases. A few projects using the library include:
 - `Code for
   "BREEDS: Benchmarks for Subpopulation Shift"
   <https://github.com/MadryLab/BREEDS-Benchmarks>`_ (https://arxiv.org/abs/2008.04859)
+- `Code for
+  "Certified Patch Robustness via Smoothed Vision Transformers." <https://github.com/MadryLab/smoothed-vit>`_ (https://arxiv.org/abs/2110.07719)
+- `Code for
+  "Unadversarial Examples: Designing Objects for Robust Vision." <https://github.com/microsoft/unadversarial>`_ (https://arxiv.org/abs/2012.12235)
 
 We
 demonstrate how to use the library in a set of walkthroughs and our API
