@@ -19,6 +19,8 @@ upcoming code releases. A few projects using the library include:
   [EIS+19]_ 
 - `Code <https://github.com/MadryLab/robustness_applications>`_ for
   "Image Synthesis with a Single (Robust) Classifier" [STE+19]_
+- `Code <https://github.com/microsoft/robust-models-transfer>`_ for
+  "Do Adversarially Robust ImageNet Models Transfer Better?" [SIE+20]_
 - `Code <https://github.com/MadryLab/BREEDS-Benchmarks>`_ for
   "BREEDS: Benchmarks for Subpopulation Shift" [STM20]_
 
@@ -120,7 +122,7 @@ follows:
    
    @misc{robustness,
       title={Robustness (Python Library)},
-      author={Logan Engstrom and Andrew Ilyas and Shibani Santurkar and Dimitris Tsipras},
+      author={Logan Engstrom and Andrew Ilyas and Hadi Salman and Shibani Santurkar and Dimitris Tsipras},
       year={2019},
       url={https://github.com/MadryLab/robustness}
    }
@@ -155,9 +157,12 @@ Contributors
 - `Logan Engstrom <https://twitter.com/logan_engstrom>`_
 - `Shibani Santurkar <https://twitter.com/ShibaniSan>`_
 - `Dimitris Tsipras <https://twitter.com/tsiprasd>`_
+- `Hadi Salman <https://twitter.com/hadisalmanX>`_
 
 .. [EIS+19] Engstrom L., Ilyas A., Santurkar S., Tsipras D., Tran B., Madry A. (2019). Learning Perceptually-Aligned Representations via Adversarial Robustness. arXiv, arXiv:1906.00945 
 
 .. [STE+19] Santurkar S., Tsipras D., Tran B., Ilyas A., Engstrom L., Madry A. (2019). Image Synthesis with a Single (Robust) Classifier. arXiv, arXiv:1906.09453
+
+.. [SIE+20] Salman H., Ilyas A., Engstrom L., Kapoor A., Madry A. (2020). Do Adversarially Robust ImageNet Models Transfer Better?. arXiv, arXiv:2007.08489
 
 .. [STM20] Santurkar S., Tsipras D., Madry A. (2020). : BREEDS: Benchmarks for Subpopulation Shift. arXiv, arXiv:2008.04859
