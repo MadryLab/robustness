@@ -23,6 +23,10 @@ upcoming code releases. A few projects using the library include:
   "Do Adversarially Robust ImageNet Models Transfer Better?" [SIE+20]_
 - `Code <https://github.com/MadryLab/BREEDS-Benchmarks>`_ for
   "BREEDS: Benchmarks for Subpopulation Shift" [STM20]_
+- `Code <https://github.com/microsoft/unadversarial>`_ for
+  "Unadversarial Examples: Designing Objects for Robust Vision" [SIE+21]_
+- `Code <https://github.com/MadryLab/smoothed-vit>`_ for
+  "Certified Patch Robustness via Smoothed Vision Transformers" [SJW+21]_
 
 We demonstrate how to use the library in a set of walkthroughs and our API
 reference. Functionality provided by the library includes:
@@ -163,6 +167,10 @@ Contributors
 
 .. [STE+19] Santurkar S., Tsipras D., Tran B., Ilyas A., Engstrom L., Madry A. (2019). Image Synthesis with a Single (Robust) Classifier. arXiv, arXiv:1906.09453
 
-.. [SIE+20] Salman H., Ilyas A., Engstrom L., Kapoor A., Madry A. (2020). Do Adversarially Robust ImageNet Models Transfer Better?. arXiv, arXiv:2007.08489
+.. [SIE+20] Salman H., Ilyas A., Engstrom L., Kapoor A., Madry A. (2020). Do Adversarially Robust ImageNet Models Transfer Better? arXiv, arXiv:2007.08489
 
-.. [STM20] Santurkar S., Tsipras D., Madry A. (2020). : BREEDS: Benchmarks for Subpopulation Shift. arXiv, arXiv:2008.04859
+.. [STM20] Santurkar S., Tsipras D., Madry A. (2020). BREEDS: Benchmarks for Subpopulation Shift. arXiv, arXiv:2008.04859
+
+.. [SIE+21] Salman H., Ilyas A., Engstrom L., Vemparala S., Kapoor A., Madry A. (2021). Unadversarial Examples: Designing Objects for Robust Vision. arXiv, arXiv:2012.12235
+
+.. [SJW+21] Salman H., Jain S., Wong E., Madry A. (2021). : Certified Patch Robustness via Smoothed Vision Transformers. arXiv, arXiv:2110.07719
