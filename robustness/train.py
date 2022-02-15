@@ -254,7 +254,7 @@ def train_model(args, model, loaders, *, checkpoint=None, dp_device_ids=None,
                 If given, this function is called every training iteration by
                 the training loop (useful for custom logging). The function is
                 given arguments `model, iteration #, loop_type [train/eval],
-                current_batch_ims, current_batch_labels`.
+                current_batch_ims, current_batch_labels, losses (AverageMeter), top1 accuracy (AverageMeter), top5 accuracy (AverageMeter)`.
             epoch hook (function, optional)
                 Similar to iteration_hook but called every epoch instead, and
                 given arguments `model, log_info` where `log_info` is a
@@ -501,7 +501,7 @@ def _model_loop(args, loop_type, loader, model, opt, epoch, adv, writer):
 
         # USER-DEFINED HOOK
         if has_attr(args, 'iteration_hook'):
-            args.iteration_hook(model, i, loop_type, inp, target)
+            args.iteration_hook(model, i, loop_type, inp, target, losses, top1, top5)
 
         iterator.set_description(desc)
         iterator.refresh()
