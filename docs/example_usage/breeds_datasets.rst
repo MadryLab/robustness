@@ -238,7 +238,7 @@ and their corresponding loaders:
   train_loader_source, val_loader_source = loaders_source
 
   dataset_target = datasets.CustomImageNet(data_dir, test_subclasses)
-  loaders_target = dataset_source.make_loaders(num_workers, batch_size)
+  loaders_target = dataset_target.make_loaders(num_workers, batch_size)
   train_loader_target, val_loader_target = loaders_target
 
 You're all set! You can then use this dataset and loaders
