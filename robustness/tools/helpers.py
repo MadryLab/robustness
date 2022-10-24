@@ -182,7 +182,7 @@ def restricted_label_mapping(classes, class_to_idx, ranges):
             if idx in range_set:
                 mapping[class_name] = new_idx
         # assert class_name in mapping
-    filtered_classes = list(mapping.keys()).sort()
+    filtered_classes = sorted(list(mapping.keys()))
     return filtered_classes, mapping
 
 def custom_label_mapping(classes, class_to_idx, ranges):
@@ -193,5 +193,5 @@ def custom_label_mapping(classes, class_to_idx, ranges):
             if idx in range_set:
                 mapping[class_name] = new_idx
 
-    filtered_classes = list(mapping.keys()).sort()
+    filtered_classes = sorted(list(mapping.keys()))
     return filtered_classes, mapping
