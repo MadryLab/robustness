@@ -90,8 +90,11 @@ def make_and_restore_model(*_, arch, dataset, resume_path=None,
     checkpoint = None
     if resume_path and os.path.isfile(resume_path):
         print("=> loading checkpoint '{}'".format(resume_path))
-        checkpoint = ch.load(resume_path, pickle_module=dill)
-        
+        if ch.cuda.is_available():
+            checkpoint = ch.load(resume_path, pickle_module=dill)
+        else:
+            checkpoint = ch.load(resume_path, pickle_module=dill, map_location=ch.device('cpu'))
+
         # Makes us able to load models saved with legacy versions
         state_dict_path = 'model'
         if not ('model' in checkpoint):
@@ -107,7 +110,8 @@ def make_and_restore_model(*_, arch, dataset, resume_path=None,
 
     if parallel:
         model = ch.nn.DataParallel(model)
-    model = model.cuda()
+    if ch.cuda.is_available():
+        model = model.cuda()
 
     return model, checkpoint
 
